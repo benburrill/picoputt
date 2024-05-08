@@ -9,7 +9,9 @@ Currently, picoputt has the following features:
   the equivalent Python/numpy implementation from my prototype.
 * Putting: hit the quantum golf-ball around using a golf club "putt-wave" with adjustable radius.
 * Measurement of position (though it's currently not implemented as a proper partial measurement).
-* Visualization with fancy pseudo-3D graphics.
+* Visualization with fancy pseudo-3D graphics:
+
+https://github.com/benburrill/picoputt/assets/8140726/2fdb1340-4eff-421d-90ee-8a88f483e5da
 
 
 ## How to play
@@ -24,6 +26,11 @@ manipulate the shape of a wavepacket.*
 
 Press space to measure position.  Although it's intended to resemble a partial measurement, currently the
 post-measurement state always has $\langle{}p\rangle = 0$ which isn't very realistic.
+
+Here's an example of pulling apart some quantum taffy and measuring its position:
+
+https://github.com/benburrill/picoputt/assets/8140726/d74da0ca-a8cb-436b-91cf-6a74b47e99d9
+
 
 
 ## Goals
