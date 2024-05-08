@@ -14,6 +14,28 @@ Currently, picoputt has the following features:
 https://github.com/benburrill/picoputt/assets/8140726/2fdb1340-4eff-421d-90ee-8a88f483e5da
 
 
+## Build instructions
+Picoputt depends on SDL2 and GLEW.  I install them with vcpkg: `vcpkg install sdl2 glew`.
+
+Build with CMake and run:
+```shell
+$ cmake .  # If using vcpkg, add -DCMAKE_TOOLCHAIN_FILE=...
+$ cmake --build .
+$ ./picoputt
+```
+
+By default, picoputt looks for resources in its parent directory.  If you want to use a different build directory, since
+these files are not copied over to the build directory, you may want to override the base directory using the
+`$PICOPUTT_BASE_DIR` environment variable:
+```shell
+$ cmake --build builddir
+$ PICOPUTT_BASE_DIR=. ./builddir/picoputt
+```
+
+You can also create a zip package with all necessary components using
+`cmake --build builddir -- package`
+
+
 ## How to play
 Click and drag to putt.
 
@@ -30,7 +52,6 @@ post-measurement state always has $\langle{}p\rangle = 0$ which isn't very reali
 Here's an example of pulling apart some quantum taffy and measuring its position:
 
 https://github.com/benburrill/picoputt/assets/8140726/d74da0ca-a8cb-436b-91cf-6a74b47e99d9
-
 
 
 ## Goals
