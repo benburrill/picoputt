@@ -1,0 +1,14 @@
+                                PICOPUTT
+                             Version @CMAKE_PROJECT_VERSION@
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~oOOo~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This will be a condensed README to include in release builds.
+But the game's not done yet, so I don't have much to say here.
+
+How to play
+-----------
+Run picoputt@CMAKE_EXECUTABLE_SUFFIX@
+
+Troubleshooting
+---------------
+potato
