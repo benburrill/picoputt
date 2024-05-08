@@ -307,6 +307,7 @@ void render() {
     uniformDisplayRelative(g_clubGfx.vert, 1.f, puttActive? puttStart : mouse);
     glUniform1f(g_clubGfx.u_radius, clubPixSize()*displayScale);
     drawQuad();
+    glDisable(GL_BLEND);
 }
 
 
