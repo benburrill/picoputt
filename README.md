@@ -26,10 +26,10 @@ $ ./picoputt
 
 By default, picoputt looks for resources in its parent directory.  If you want to use a different build directory, since
 these files are not copied over to the build directory, you may want to override the base directory using the
-`$PICOPUTT_BASE_DIR` environment variable:
+`$PICOPUTT_BASE_PATH` environment variable:
 ```shell
 $ cmake --build builddir
-$ PICOPUTT_BASE_DIR=. ./builddir/picoputt
+$ PICOPUTT_BASE_PATH=. ./builddir/picoputt
 ```
 
 You can also create a zip package with all necessary components using
