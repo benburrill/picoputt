@@ -1,4 +1,4 @@
-#version 330
+#version 430
 // The putt-wave.  Near the origin, it is approximately a plane wave
 // with momentum u_momentum.  Away from the origin (r >> u_clubRadius),
 // the wavelength increases proportional to r (and so local momentum

@@ -7,10 +7,8 @@ int main(int argc, char *argv[]) {
     int err = 0;
     if ((err = startGame()) != 0 || (err = gameLoop()) != 0) {
         showCritError("%s", SDL_GetError());
-        quitGame();
-        return err;
     }
 
     quitGame();
-    return 0;
+    return err;
 }

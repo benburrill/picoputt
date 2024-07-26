@@ -1,0 +1,87 @@
+#version 430
+// Initializes the bottom layer of the line integral pyramid with the drag force
+
+// Using blocks of size 6, with boundary of 1 (for total size of 8)
+#define BLOCK_SIZE 6
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+shared vec2 psi[8][8];     // destaggerified wavefunction
+shared vec2 direct[8][8];  // line integrals along direct path (ie rescaled discrete phase differences)
+
+layout(rg32f) uniform image2D u_lipOut;
+layout(rg32f) uniform image2D u_cur;
+layout(rg32f) uniform image2D u_prev;
+uniform ivec2 u_simSize;
+
+float ieee754Atan2(float y, float x) {
+    // Follows IEEE 754 rules for the case where x and y are both 0.
+
+    // GLSL atan(y, x): "Results are undefined if x and y are both 0"
+    // IEEE 754 atan2(y, x): "atan2(±0, −0) is ±π, atan2(±0, +0) is ±0"
+    // The function name "ieee754Atan2" is really only accurate under
+    // the (unsafe) assumption that for all other cases GLSL atan will
+    // behave like IEEE 754 atan2.
+    // But really all I care about is ieee754Atan2(0., 0.) == 0.
+    // For that not to work, infinities would need to be handled very
+    // strangely.
+
+    if (x == 0. && y == 0.) x = 1./x; // ±∞
+    return atan(y, x);
+}
+
+float phaseDiff(vec2 a, vec2 b) {
+    // conceptually similar to angle(b) - angle(a)
+    return ieee754Atan2(a.r*b.g - a.g*b.r, a.r*b.r + a.g*b.g);
+}
+
+void main() {
+    ivec2 origin = BLOCK_SIZE * ivec2(gl_WorkGroupID.xy);
+    ivec2 pos = origin + ivec2(gl_LocalInvocationID.xy) - 1;
+    ivec2 clampedPos = clamp(pos, ivec2(0), u_simSize - 1);
+
+    ivec2 lPos = ivec2(gl_LocalInvocationID.xy);
+    ivec2 lUp = ivec2(lPos.x, min(lPos.y + 1, u_simSize.y));
+    ivec2 lRight = ivec2(min(lPos.x + 1, u_simSize.x), lPos.y);
+
+    // See pdf.frag / qturn.frag:
+    // u_cur  = R(t) + I(t+dt/2)i,   cur  = R(t) + I(t+dt/2)i
+    // u_prev = I(t-dt/2) - R(t)i,   prev = R(t) + I(t-dt/2)i
+    vec2 cur = imageLoad(u_cur, clampedPos).rg;
+    vec2 prev = imageLoad(u_prev, clampedPos).gr * vec2(-1., 1.);
+    float midImag = 0.5 * (cur.g + prev.g);
+    // This is an attempt to somewhat unstagger the wavefunction, not
+    // sure how much sense it actually makes.
+    psi[lPos.x][lPos.y] = vec2(
+        sign(cur.r) * sqrt(abs(dot(cur, prev) - midImag*midImag)),
+        midImag
+    );
+
+    // Alternative simple version:
+    // psi[lPos.x][lPos.y] = imageLoad(u_cur, clampedPos).rg;
+
+    // TODO: I don't really know if both barriers are necessary here.
+    memoryBarrierShared();
+    barrier();
+
+    float drag = 2e-3; // TODO: uniform / uniform texture.  Also double check sign
+    direct[lPos.x][lPos.y] = drag * vec2(
+        phaseDiff(psi[lPos.x][lPos.y], psi[lRight.x][lRight.y]),
+        phaseDiff(psi[lPos.x][lPos.y], psi[lUp.x][lUp.y])
+    );
+
+    memoryBarrierShared();
+    barrier();
+
+    if (clamp(lPos, 1, BLOCK_SIZE) == lPos) {
+        vec2 result = 0.5 * direct[lPos.x][lPos.y] + 0.25 * vec2(
+            // top and bottom lobes
+            direct[lPos.x][lPos.y + 1].x + direct[lPos.x][lPos.y].y     - direct[lPos.x + 1][lPos.y].y +
+            direct[lPos.x][lPos.y - 1].x - direct[lPos.x][lPos.y - 1].y + direct[lPos.x + 1][lPos.y - 1].y,
+
+            // right and left lobes
+            direct[lPos.x + 1][lPos.y].y + direct[lPos.x][lPos.y].x     - direct[lPos.x][lPos.y + 1].x +
+            direct[lPos.x - 1][lPos.y].y - direct[lPos.x - 1][lPos.y].x + direct[lPos.x - 1][lPos.y + 1].x
+        );
+
+        imageStore(u_lipOut, pos, vec4(result, 0., 1.));
+    }
+}

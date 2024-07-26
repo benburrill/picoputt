@@ -169,3 +169,18 @@ GLuint compileAndLinkFragProgram(Shader *vert, const char *basePath, const char 
     glDeleteShader(fragId);  // Lifetime of fragment shader is bound to program
     return program;
 }
+
+GLuint compileAndLinkCompProgram(const char *basePath, const char *compPath) {
+    GLuint compId = loadShader(GL_COMPUTE_SHADER, basePath, compPath);
+    if (compId == 0) return 0;
+
+    GLuint program = glCreateProgram();
+    glAttachShader(program, compId);
+    program = linkProgramOrDelete(program, compPath);
+    if (program == 0) {
+        SDL_SetError("%s\n> Compute shader: %s", SDL_GetError(), compPath);
+        return 0;
+    }
+
+    return program;
+}

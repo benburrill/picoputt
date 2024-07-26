@@ -43,6 +43,7 @@ typedef struct {
     GLint u_dt;
     GLint u_prev;
     GLint u_potential;
+    GLint u_dragPot;
 } ProgQTurn;
 extern ProgQTurn g_qturn;
 
@@ -73,6 +74,18 @@ typedef struct {
     GLint u_light;
 } ProgRenderer;
 extern ProgRenderer g_renderer;
+
+typedef struct {
+    union {
+        Program prog;
+        ProgSurface vert;
+    };
+
+    GLint u_colormap;
+    GLint u_data;
+    GLint u_mode;
+} ProgDebugRenderer;
+extern ProgDebugRenderer g_debugRenderer;
 
 typedef struct {
     union {
@@ -128,13 +141,46 @@ typedef struct {
 } ProgRSumReduce;
 extern ProgRSumReduce g_rsumReduce;
 
+typedef struct {
+    Program prog;
+    GLint u_cur;
+    GLint u_prev;
+    GLint u_lipOut;
+    GLint u_simSize;
+} ProgInitLIP;
+extern ProgInitLIP g_initLIP;
+
+typedef struct {
+    Program prog;
+    GLint u_lipOut;
+    GLint u_lipIn;
+} ProgBuildLIP;
+extern ProgBuildLIP g_buildLIP;
+
+typedef struct {
+    Program prog;
+    GLint u_potOut;
+    GLint u_lipIn;
+} ProgLIPKiss;
+extern ProgLIPKiss g_LIPKiss;
+
+typedef struct {
+    Program prog;
+    GLint u_potOut;
+    GLint u_lipIn;
+    GLint u_scale;
+} ProgIntegrateLIP;
+extern ProgIntegrateLIP g_integrateLIP[2];
+
 // TODO: for time-dep pots we probably want 2 buffers so we precompute
 //  the next potential while we're using the current one
 extern TexturedFrameBuffer g_potentialBuffer;
 extern TexturedFrameBuffer g_simBuffers[2];
 extern TexturedFrameBuffer g_puttBuffer;
 extern TexturedFrameBuffer g_pdfBuffer;
-extern PyramidBuffer g_pdfPyramid;
+extern PaddedPyramidBuffer g_pdfPyramid;
+extern PyramidBuffer g_dragLIP;
+extern TexturedFrameBuffer g_dragPot;
 extern GLuint g_skyboxTexture;
 extern GLuint g_colormapTexture;
 

@@ -1,0 +1,89 @@
+#version 430
+// Builds the next layer of the line integral pyramid from the previous
+
+// Using blocks of size 6, with boundary of 1 (for total size of 8)
+#define BLOCK_SIZE 6
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+shared vec2 direct[8][8];  // line integrals along direct path
+
+layout(rg32f) uniform image2D u_lipOut;
+layout(rg32f) uniform image2D u_lipIn;
+
+void main() {
+    ivec2 prevSize = imageSize(u_lipIn);
+    ivec2 origin = BLOCK_SIZE * ivec2(gl_WorkGroupID.xy);
+    ivec2 lPos = ivec2(gl_LocalInvocationID.xy);
+    ivec2 posOut = origin + lPos - 1;
+    ivec2 posIn = 2 * posOut;
+    ivec2 clampedPos = clamp(posIn, ivec2(0), prevSize - 1);
+
+    direct[lPos.x][lPos.y] = (imageLoad(u_lipIn, clampedPos).xy + vec2(
+        imageLoad(u_lipIn, clampedPos + ivec2(1, 0)).x,
+        imageLoad(u_lipIn, clampedPos + ivec2(0, 1)).y
+    )) * vec2(greaterThanEqual(posIn, ivec2(0)));
+
+    memoryBarrierShared();
+    barrier();
+
+    if (clamp(lPos, 1, BLOCK_SIZE) == lPos && posIn == clampedPos) {
+        // evenEnd matches with posIn if prevSize is even and posEnd is
+        // the (next to) last position.
+        ivec2 evenEnd = prevSize - 2;
+
+        // Weights for top, bottom, left, and right lobes, respectively
+        float wt = 0.25;
+        float wb = 0.25;
+        float wl = 0.25;
+        float wr = 0.25;
+
+        if (posIn.x == evenEnd.x) {
+            wr *= 2.;  // -> 0.5
+            wt = 0.;
+            wb = 0.;
+        }
+
+        if (posIn.y == evenEnd.y) {
+            wt *= 2.;  // -> 0.5 or 0.
+            wl = 0.;
+            wr = 0.;
+        }
+
+        vec2 result = (1. - vec2(wt + wb, wl + wr)) * direct[lPos.x][lPos.y] + vec2(
+            // top and bottom lobes
+            wt * (direct[lPos.x][lPos.y + 1].x + direct[lPos.x][lPos.y].y     - direct[lPos.x + 1][lPos.y].y) +
+            wb * (direct[lPos.x][lPos.y - 1].x - direct[lPos.x][lPos.y - 1].y + direct[lPos.x + 1][lPos.y - 1].y),
+
+            // right and left lobes
+            wr * (direct[lPos.x + 1][lPos.y].y + direct[lPos.x][lPos.y].x     - direct[lPos.x][lPos.y + 1].x) +
+            wl * (direct[lPos.x - 1][lPos.y].y - direct[lPos.x - 1][lPos.y].x + direct[lPos.x - 1][lPos.y + 1].x)
+        );
+
+        imageStore(u_lipOut, posOut, vec4(result, 0., 1.));
+
+        if (posIn.x == evenEnd.x) {
+            // We're now using wr to weight the LEFT lobe of rightResult
+            // It was used previously to weight the right lobe of result
+
+            // mix(x, y, a) = (1-a)*x + a*y
+            float rightResult = mix(
+                direct[lPos.x + 1][lPos.y].y,
+                result.y - direct[lPos.x][lPos.y].x + direct[lPos.x][lPos.y + 1].x,
+                wr
+            );
+
+            imageStore(u_lipOut, posOut + ivec2(1, 0), vec4(0., rightResult, 0., 1.));
+        }
+
+        if (posIn.y == evenEnd.y) {
+            // As above, we're using wt to weight bottom lobe now
+
+            float topResult = mix(
+                direct[lPos.x][lPos.y + 1].x,
+                result.x - direct[lPos.x][lPos.y].y + direct[lPos.x + 1][lPos.y].y,
+                wt
+            );
+
+            imageStore(u_lipOut, posOut + ivec2(0, 1), vec4(topResult, 0., 0., 1.));
+        }
+    }
+}

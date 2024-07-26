@@ -1,4 +1,4 @@
-#version 330
+#version 430
 // Produces a visualization of the wavefunction.
 // In case you find my fancy graphics scientifically uncouth (or if they
 // run too slow), you can disable them by setting FANCY to 0 to get a

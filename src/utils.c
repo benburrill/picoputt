@@ -49,7 +49,7 @@ char *getGlErrorString(GLenum errCode) {
 
 #define KNOWN_GL_ERRORS 8
 static unsigned int glErrorStatus = 0;
-void processGlErrors() {
+int processGlErrors(const char *info) {
     // In debug mode, this prints (not logs, so that if there are errors
     // every frame, GL error spam can be separated from possibly more
     // useful log info) any GL errors that are in the error queue.
@@ -62,19 +62,23 @@ void processGlErrors() {
     // has a size of 1.  If there is an error in the queue, all further
     // errors of any kind are ignored.
 
+    int numErrors = 0;
     for (GLenum err; (err = glGetError()) != GL_NO_ERROR;) {
 #ifndef NDEBUG
-        printf("OpenGL error: %s\n", getGlErrorString(err));
+        if (info == NULL) info = "OpenGL error";
+        printf("%s: %s\n", info, getGlErrorString(err));
 #endif
         unsigned int errIdx = err - GL_INVALID_ENUM;
         if (errIdx < KNOWN_GL_ERRORS) glErrorStatus |= 1 << errIdx;
         else glErrorStatus |= 1 << KNOWN_GL_ERRORS;
+        numErrors++;
     }
+    return numErrors;
 }
 
 // Log and clear unique GL errors that were observed by processGlErrors
 void logGlErrors() {
-    processGlErrors();
+    processGlErrors(NULL);
     if (!glErrorStatus) return;
     SDL_LogError(
         SDL_LOG_CATEGORY_APPLICATION,

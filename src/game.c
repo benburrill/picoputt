@@ -40,7 +40,7 @@ int startGame() {
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
     // TODO: g_width and g_height probably should be from SDL_GL_GetDrawableSize
-    g_width = 1024;
+    g_width = 960;
     g_height = 640;
     g_window = SDL_CreateWindow(
         "picoputt",

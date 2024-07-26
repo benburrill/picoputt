@@ -1,0 +1,32 @@
+#version 430
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(r32f) uniform image2D u_potOut;
+layout(rg32f) uniform image2D u_lipIn;
+uniform int u_scale;
+
+void main() {
+    ivec2 potSize = imageSize(u_potOut);
+    ivec2 layerSize = imageSize(u_lipIn);
+
+    int il = 2 * int(gl_GlobalInvocationID.x);
+    int iy = 2 * int(gl_GlobalInvocationID.y);
+
+    if (il < layerSize.x - 2 && iy <= layerSize.y) {
+        iy = min(iy, layerSize.y - 1);
+
+        int ir = il + 1;
+        int x = ir * u_scale;
+        int y = min(iy * u_scale, potSize.y - 1);
+
+        float diffLeft = imageLoad(u_lipIn, ivec2(il, iy)).x;
+        float diffRight = imageLoad(u_lipIn, ivec2(ir, iy)).x;
+
+        float potLeft = imageLoad(u_potOut, ivec2(x - u_scale, y)).r;
+        float potRight = imageLoad(u_potOut, ivec2(min(x + u_scale, potSize.x - 1), y)).r;
+
+        float result = 0.5 * (potLeft + diffLeft) + 0.5 * (potRight - diffRight);
+        imageStore(u_potOut, ivec2(x, y), vec4(result, 0., 0., 1.));
+    }
+}

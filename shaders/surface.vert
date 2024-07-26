@@ -1,4 +1,4 @@
-#version 330
+#version 430
 // Outputs surface position, based on scale and shift of vertex UV coordinates
 
 out vec2 v_pos;

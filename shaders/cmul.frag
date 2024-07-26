@@ -1,4 +1,4 @@
-#version 330
+#version 430
 // Complex multiplication of textures
 
 out vec2 o_result;

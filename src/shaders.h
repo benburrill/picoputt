@@ -23,4 +23,5 @@ GLuint compileShaderOrDelete(GLuint shader, const char *name);
 GLuint linkProgramOrDelete(GLuint program, const char *name);
 GLuint buildProgramFromShaders(Shader *vert, Shader *frag);
 GLuint compileAndLinkFragProgram(Shader *vert, const char *basePath, const char *fragPath, const char *fragOutVar);
+GLuint compileAndLinkCompProgram(const char *basePath, const char *compPath);
 #endif //PICOPUTT_SHADERS_H

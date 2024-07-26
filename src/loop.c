@@ -7,7 +7,7 @@
 #include "utils.h"
 #include "resources.h"
 
-#define PHYS_TURNS_PER_SECOND 800
+#define PHYS_TURNS_PER_SECOND 400
 // #define PHYS_TURNS_PER_SECOND 1
 
 // This is misleadingly named, FPS can go lower than this.
@@ -25,6 +25,8 @@ static float clubSize = 0.25f;
 static int puttActive = 0;
 static float puttPhase = 0.f;
 static int paused = 0;
+static int debugView = 0;
+static size_t debugViewIdx = 0;
 static SDL_Point puttStart;
 static SDL_Rect displayArea;
 float displayScale;
@@ -73,6 +75,8 @@ void initPhysics(float x0, float y0) {
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, g_potentialBuffer.texture);
 
+    // TODO: u_dragPot
+
     drawQuad();
     glEndQuery(GL_TIME_ELAPSED);
     // In the future, I'll be doing more stuff than just 4 qturns in a
@@ -96,12 +100,23 @@ void initPhysics(float x0, float y0) {
 int doPhysics(int turnsNeeded, double maxTime) {
     // Assumed preconditions: g_qturn has u_dt and u_4m_dx2 already set
     glViewport(0, 0, g_simBuffers[0].width, g_simBuffers[0].height);
+
+    // TODO: consider switching to use only image units (glBindImageTexture)
+    //   rather than texture units (glActiveTexture)
+    //   I'm not quite sure though if we're writing to the images with a
+    //   framebuffer whether we need to use GL_READ_WRITE and whether we
+    //   need glMemoryBarrier.
+    glBindImageTexture(0, g_simBuffers[0].texture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RG32F);
+    glBindImageTexture(1, g_simBuffers[1].texture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RG32F);
+
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, g_simBuffers[0].texture);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, g_simBuffers[1].texture);
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, g_potentialBuffer.texture);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, g_dragPot.texture);
 
     GLint queryDone;
     glGetQueryObjectiv(perfQuery, GL_QUERY_RESULT_AVAILABLE, &queryDone);
@@ -122,11 +137,99 @@ int doPhysics(int turnsNeeded, double maxTime) {
 
         for (int i = 0; i < 4; i++) {
             glUniform1i(g_qturn.u_potential, 2);
+            glUniform1i(g_qturn.u_dragPot, 3);
             glUniform1i(g_qturn.u_prev, 0 + curBuf);
             curBuf = 1 - curBuf;
             glBindFramebuffer(GL_FRAMEBUFFER, g_simBuffers[curBuf].fbo);
             drawQuad();
         }
+
+        glBindImageTexture(2, g_dragLIP.layers[0].texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F);
+
+        glUseProgram(g_initLIP.prog.id);
+        glUniform1i(g_initLIP.u_cur, curBuf);
+        glUniform1i(g_initLIP.u_prev, 1 - curBuf);
+        glUniform1i(g_initLIP.u_lipOut, 2);
+        glUniform2i(g_initLIP.u_simSize, g_simBuffers[0].width, g_simBuffers[0].height);
+
+        glDispatchCompute((g_simBuffers[0].width + 5)/6, (g_simBuffers[0].height + 5)/6, 1);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+        glUseProgram(g_buildLIP.prog.id);
+        int prevBound = 0;
+        for (int i = 1; i < g_dragLIP.numLayers; i++) {
+            // TODO: why this no work...
+            // glBindImageTexture(3 - prevBound, g_dragLIP.layers[i].texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F);
+            // glUniform1i(g_buildLIP.u_lipIn, 2 + prevBound);
+            // glUniform1i(g_buildLIP.u_lipOut, 3 - prevBound);
+
+            // ... but this does:
+            // glBindImageTexture(2, g_dragLIP.layers[i - 1].texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F);
+            // glBindImageTexture(3, g_dragLIP.layers[i].texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F);
+            // glUniform1i(g_buildLIP.u_lipIn, 2);
+            // glUniform1i(g_buildLIP.u_lipOut, 3);
+
+            // Even this works... wtf?  It should be literally the same, just with a redundant bind
+            // It seems that without the "redundant" bind, u_lipIn stays stuck on g_dragLIP.layers[0]
+            // u_lipOut changes (as it should) to g_dragLIP.layers[i] though
+            glBindImageTexture(2 + prevBound, g_dragLIP.layers[i - 1].texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F);
+            glBindImageTexture(3 - prevBound, g_dragLIP.layers[i].texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F);
+            glUniform1i(g_buildLIP.u_lipIn, 2 + prevBound);
+            glUniform1i(g_buildLIP.u_lipOut, 3 - prevBound);
+
+            glDispatchCompute((g_dragLIP.layers[i - 1].width + 11)/12, (g_dragLIP.layers[i - 1].height + 11)/12, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+            prevBound = 1 - prevBound;
+        }
+
+        int lipBind = 2 + prevBound;
+        int potBind = 3 - prevBound;
+        glBindImageTexture(lipBind, g_dragLIP.layers[g_dragLIP.numLayers - 1].texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F);
+        glBindImageTexture(potBind, g_dragPot.texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_R32F);
+        glUseProgram(g_LIPKiss.prog.id);
+        glUniform1i(g_LIPKiss.u_lipIn, lipBind);
+        glUniform1i(g_LIPKiss.u_potOut, potBind);
+
+        glDispatchCompute(1, 1, 1);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+        processGlErrors("after blah");
+
+        for (int i = g_dragLIP.numLayers - 2; i >= 0; i--) {
+            int scale = 1 << i;
+            int numX, numY;
+            glBindImageTexture(lipBind, g_dragLIP.layers[i].texture, 0, GL_FALSE, 0, GL_READ_ONLY, GL_RG32F);
+
+            numX = (g_dragLIP.layers[i].width - 1)/2;
+            numY = g_dragLIP.layers[i + 1].height;
+            if (numX > 0) {
+                glUseProgram(g_integrateLIP[0].prog.id);
+                glUniform1i(g_integrateLIP[0].u_lipIn, lipBind);
+                glUniform1i(g_integrateLIP[0].u_potOut, potBind);
+                glUniform1i(g_integrateLIP[0].u_scale, scale);
+
+                glDispatchCompute((numX + 7)/8, (numY + 7)/8, 1);
+                glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+                if (processGlErrors("after integrate_lip_x")) printf("i: %d, w: %d, h: %d, wgx: %d, wgy: %d, numX: %d, numY: %d\n", i, g_dragLIP.layers[i].width, g_dragLIP.layers[i].height, (numX + 7)/8, (numY + 7)/8, numX, numY);
+            }
+
+            numX = g_dragLIP.layers[i].width;
+            numY = (g_dragLIP.layers[i].height - 1)/2;
+            if (numY > 0) {
+                glUseProgram(g_integrateLIP[1].prog.id);
+                glUniform1i(g_integrateLIP[1].u_lipIn, lipBind);
+                glUniform1i(g_integrateLIP[1].u_potOut, potBind);
+                glUniform1i(g_integrateLIP[1].u_scale, scale);
+
+                glDispatchCompute((numX + 7)/8, (numY + 7)/8, 1);
+                glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+                if (processGlErrors("after integrate_lip_y")) printf("i: %d, w: %d, h: %d, wgx: %d, wgy: %d\n", i, g_dragLIP.layers[i].width, g_dragLIP.layers[i].height, (numX + 7)/8, (numY + 7)/8);
+            }
+        }
+
+        // Not sure if necessary
+        glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
 
         // We allow at least one turn to run (assuming turns > 0) before
         // checking maxTurns.
@@ -148,7 +251,7 @@ int doPhysics(int turnsNeeded, double maxTime) {
     glUseProgram(g_rsumReduce.prog.id);
     glUniform1i(g_rsumReduce.u_src, 2);
     glActiveTexture(GL_TEXTURE2);
-    for (int i = 1; i < g_pdfPyramid.numLevels; i++) {
+    for (int i = 1; i < g_pdfPyramid.numLayers; i++) {
         glBindFramebuffer(GL_FRAMEBUFFER, g_pdfPyramid.layers[i].buf.fbo);
         glViewport(0, 0, g_pdfPyramid.layers[i].dataWidth, g_pdfPyramid.layers[i].dataHeight);
         glBindTexture(GL_TEXTURE_2D, g_pdfPyramid.layers[i - 1].buf.texture);
@@ -179,10 +282,13 @@ void applyPutt() {
     glBindTexture(GL_TEXTURE_2D, g_potentialBuffer.texture);
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D, g_puttBuffer.texture);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, g_dragPot.texture);
 
     // Do half a qturn to un-stagger the wavefunction
     glUseProgram(g_qturn.prog.id);
     glUniform1i(g_qturn.u_potential, 2);
+    glUniform1i(g_qturn.u_dragPot, 4);
     glUniform1f(g_qturn.u_dt, 0.5f * dt);
     glUniform1i(g_qturn.u_prev, 0 + curBuf);
     curBuf = 1 - curBuf;
@@ -199,6 +305,7 @@ void applyPutt() {
     // Do another half qturn to re-stagger the wavefunction
     glUseProgram(g_qturn.prog.id);
     glUniform1i(g_qturn.u_potential, 2);
+    glUniform1i(g_qturn.u_dragPot, 4);
     glUniform1i(g_qturn.u_prev, 0 + curBuf);
     curBuf = 1 - curBuf;
     glBindFramebuffer(GL_FRAMEBUFFER, g_simBuffers[curBuf].fbo);
@@ -250,6 +357,30 @@ void uniformDisplayRelative(ProgSurface prog, float scale, SDL_Point centerScree
     );
 }
 
+void renderDebug(GLuint texture, float a, float b, float c, float d) {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glClearColor(0.8f, 0.8f, 0.8f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    glViewport(displayArea.x, displayArea.y, displayArea.w, displayArea.h);
+    glUseProgram(g_debugRenderer.prog.id);
+
+    glUniform2f(g_debugRenderer.vert.u_scale, 1.f, 1.f);
+    glUniform2f(g_debugRenderer.vert.u_shift, 0.f, 0.f);
+
+    glUniform4f(g_debugRenderer.u_mode, a, b, c, d);
+    glUniform1i(g_debugRenderer.u_data, 2);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, texture);
+
+    glUniform1i(g_debugRenderer.u_colormap, 3);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, g_colormapTexture);
+
+    drawQuad();
+}
+
 void render() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
@@ -274,7 +405,7 @@ void render() {
 
     glUniform1i(g_renderer.u_totalProb, 1);
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, g_pdfPyramid.layers[g_pdfPyramid.numLevels - 1].buf.texture);
+    glBindTexture(GL_TEXTURE_2D, g_pdfPyramid.layers[g_pdfPyramid.numLayers - 1].buf.texture);
 
     glUniform1i(g_renderer.u_skybox, 2);
     glActiveTexture(GL_TEXTURE2);
@@ -311,7 +442,7 @@ void render() {
 }
 
 
-SDL_Point samplePyramid(PyramidBuffer *pbuf) {
+SDL_Point samplePyramid(PaddedPyramidBuffer *pbuf) {
     // TODO: I get the sense from testing this that there's a bias
     //  towards (0, 0).  Holding down space to do a random walk tends to
     //  kiss the lower left corner more often than any other.
@@ -322,11 +453,17 @@ SDL_Point samplePyramid(PyramidBuffer *pbuf) {
     // it is different from the one used by the GL).", my understanding is that
     // it's more proper to use float rather than GLfloat, but I'm a bit unsure.
     float prev;
-    size_t layer = pbuf->numLevels - 1;
+    size_t layer = pbuf->numLayers - 1;
     glBindFramebuffer(GL_FRAMEBUFFER, pbuf->layers[layer].buf.fbo);
     glReadPixels(0, 0, 1, 1, GL_RED, GL_FLOAT, &prev);
 
     while (layer--) {
+        // TODO: I'm feeling a bit paranoid about GL_PACK_ALIGNMENT.
+        //  Confirm that that isn't a problem here.  I think it can't be
+        //  or I would have noticed worse behavior, but still should
+        //  look into it.  Also couldn't we get out of bounds for non
+        //  power of 2 textures?  Or is that completely handled by the
+        //  padding, I can't remember.
         float quad[4];
         glBindFramebuffer(GL_FRAMEBUFFER, pbuf->layers[layer].buf.fbo);
         glReadPixels(2*x, 2*y, 2, 2, GL_RED, GL_FLOAT, &quad);
@@ -393,15 +530,26 @@ int gameLoop() {
             float px = 5e-4f*(float)(mouseX - puttStart.x);
             float py = 5e-4f*(float)(puttStart.y - mouseY);
             glUniform2f(g_putt.u_momentum, px, py);
-            puttPhase += hypotf(px, py) * 0.5f * PHYS_TURNS_PER_SECOND * dt * (float)frameDuration / mass;
+            puttPhase += hypotf(px, py) * 0.5f * PHYS_TURNS_PER_SECOND * dt * (float)slopTime / mass;
+            slopTime = 0.;  // slopTime is fully consumed by the putt animation
             puttPhase = fmodf(puttPhase, 2.*M_PI);
             glUniform1f(g_putt.u_phase, puttPhase);
 
             drawQuad();
+        } else {
+            // If slopTime isn't used, it still needs to be reset to 0
+            // (fully consumed by the frame).
+            // TODO: probably could do this a bit more cleanly, and it
+            //  should probably belong entirely to the physics system
+            //  rather than being used for multiple things.
+            slopTime = 0.;
         }
 
         // if (frame == 0) paused = 1;
-        render();
+        if (debugView) {
+            if (debugViewIdx % 2 == 0) renderDebug(g_dragPot.texture, 5e-2f, 0.f, 0.f, 0.f);
+            else renderDebug(g_dragLIP.layers[0].texture, 1e-3f, 0.f, 0.f, 0.f);
+        } else render();
 
         SDL_Event e;
         while (SDL_PollEvent(&e)) switch (e.type) {
@@ -429,11 +577,15 @@ int gameLoop() {
                     );
 
                     // float totalProb;
-                    // glBindFramebuffer(GL_FRAMEBUFFER, g_pdfPyramid.layers[g_pdfPyramid.numLevels - 1].buf.fbo);
+                    // glBindFramebuffer(GL_FRAMEBUFFER, g_pdfPyramid.layers[g_pdfPyramid.numLayers - 1].buf.fbo);
                     // glReadPixels(0, 0, 1, 1, GL_RED, GL_FLOAT, &totalProb);
                     // SDL_Log("totalProb: %f", totalProb);
                 } else if (e.key.keysym.sym == SDLK_p) {
                     paused = !paused;
+                } else if (e.key.keysym.sym == SDLK_d) {
+                    debugView = !debugView;
+                } else if (e.key.keysym.sym == SDLK_a) {
+                    debugViewIdx++;
                 } else if (e.key.keysym.sym == SDLK_SPACE) {
                     SDL_Point measurement = samplePyramid(&g_pdfPyramid);
                     initPhysics(dx*(float)measurement.x, dx*(float)measurement.y);
@@ -450,7 +602,7 @@ int gameLoop() {
             clubSize = SDL_min(clubSize, 1.f);
         }
 
-        processGlErrors();
+        processGlErrors(NULL);
         frame++;
     }
 }

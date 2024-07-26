@@ -1,4 +1,4 @@
-#version 330
+#version 430
 // Sum the red channel of the 4 child pixels from the previous layer of
 // the pyramid to produce a new layer of half the size.
 // For non-power-of-two textures, the layers are expected to be padded

@@ -1,0 +1,29 @@
+#version 430
+// Intermediate stage of LIP integration, dispatched with 1 workgroup
+
+// TODO: it seems a bit of a waste for a shader to write only 4 values
+//  to an image.  At some point in the future, I'd like for this shader
+//  to get a little more _intimate_.  Still in a single workgroup, it
+//  could build the top few layers of the pyramid (writing results to
+//  workgroup shared memory rather than to an image as build_lip does)
+//  and then integrate integrate those layers as integrate_lip_x and
+//  integrate_lip_y do.  It'd be a big sloppy mess though, and I don't
+//  know if I'm ready for that, as I don't feel I have totally finalized
+//  the algorithm.
+
+layout(local_size_x = 2, local_size_y = 2, local_size_z = 1) in;
+
+layout(r32f) uniform image2D u_potOut;
+layout(rg32f) uniform image2D u_lipIn;
+
+void main() {
+    ivec2 towards = 2 * ivec2(gl_LocalInvocationID.xy) - 1;
+    float base = imageLoad(u_lipIn, ivec2(0, gl_LocalInvocationID.y)).x;
+    float edge = imageLoad(u_lipIn, ivec2(0, 0)).y + imageLoad(u_lipIn, ivec2(1, 0)).y;
+
+    float result = towards.x * 0.5 * base + towards.y * 0.25 * edge;
+    imageStore(
+        u_potOut, (imageSize(u_potOut) - 1) * ivec2(gl_LocalInvocationID.xy),
+        vec4(result, 0., 0., 1.)
+    );
+}

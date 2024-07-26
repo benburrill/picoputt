@@ -1,4 +1,4 @@
-#version 330
+#version 430
 // Outputs probability density, |psi|^2.  Following Visscher, since psi
 // is staggered, we define |psi|^2 as R(t)^2 + I(t+dt/2)I(t-dt/2).
 // If u_cur = R(t) + I(t+dt/2)i, then due to the rotation of qturn.frag,

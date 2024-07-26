@@ -5,7 +5,7 @@
 
 char *getEnvDir(const char *var);
 char *getGlErrorString(GLenum errCode);
-void processGlErrors();
+int processGlErrors(const char *info);
 void logGlErrors();
 
 // Intended usage: if (SET_ERR_IF_TRUE(bad stuff)) return error code;

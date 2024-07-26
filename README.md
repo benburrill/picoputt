@@ -9,6 +9,7 @@ Currently, picoputt has the following features:
   the equivalent Python/numpy implementation from my prototype.
 * Putting: hit the quantum golf-ball around using a golf club "putt-wave" with adjustable radius.
 * Measurement of position (though it's currently not implemented as a proper partial measurement).
+* Energy dissipation with quantum analog to a linear drag force.
 * Visualization with fancy pseudo-3D graphics:
 
 https://github.com/benburrill/picoputt/assets/8140726/2fdb1340-4eff-421d-90ee-8a88f483e5da
@@ -59,17 +60,19 @@ Contrary to the source material, I don't want picoputt to be too much of a game 
 we're trying to play golf.  Although there will be (partial) position measurement, it won't be a matter of measuring
 the golf ball's position until you get lucky enough for it to end up in the hole, measurement will just be a tool to
 re-localize the golf ball that adds to your score, just like putting will.
+I plan to make putting contribute 1 to your score (like classical golf) and measurement contribute 1/2.  In other words:
+measure twice, putt once (not necessarily in that order).
 
 The object of the game will be to reach some probability threshold in a particular energy eigenstate of the golf course,
 specifically the local minimum energy state at the hole.  Since it will be based on energy state rather than position,
-simply getting probability into the hole won't be sufficient -- the ball needs to come to rest there.  For this to work,
-we'll need a dissipative effect.  The plan is to use an effect I call phase drag, which acts as a linear drag force on
-the phase gradient.
-The local minimum energy state at the hole of the total golf-course Hamiltonian $H_g = H_0 + V_{hole}$ will be
-approximated by simply using the ground state of the hole Hamiltonian.
+simply getting probability into the hole won't be sufficient -- the ball needs to come to rest there.  The local minimum
+energy state at the hole of the total golf-course Hamiltonian $H_g = H_0 + V_{hole}$ will be approximated by simply
+using the ground state of the hole Hamiltonian, but in order for the
+ball to come to rest, a dissipative effect is necessary.
 
-I've yet to implement this phase-drag effect in picoputt, but I have implemented it in my prototype by using skimage's
-unwrap_phase to do a 2D phase unwrapping, which I then scale down and reapply to the wavefunction's magnitude to
-decrease the phase gradient everywhere each timestep.  Although it's a bit mathematically sketchy, qualitatively it
-works quite well as a drag force and has some interesting effects like decreasing the tendency of a wavepacket to spread
-out (making it "more classical").
+Energy dissipation in picoputt is implemented with an effect I call phase drag, which acts as a linear drag force on
+the phase gradient.  I'll describe more technical details later, but basically phase gradient is a measure of local
+momentum, and so phase drag tries to decrease the phase gradient everywhere each timestep.  Actually the irrotational
+component of the phase gradient is what's used, so phase drag has no effect on quantum vortices.  Although it's a bit
+mathematically sketchy, qualitatively it works quite well as a drag force and has some interesting effects like
+decreasing the tendency of a wavepacket to spread out (making it "more classical").

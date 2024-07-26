@@ -4,7 +4,8 @@
 #include <assert.h>
 #include "utils.h"
 
-void uninitializedTexImage2D(GLenum target, GLint level, GLsizei width, GLsizei height, GLint internalformat) {
+// If uninitialized is 0, it is 0-initialized.  Otherwise, it is uninitialized.
+void emptyTexImage2D(GLenum target, GLint level, GLsizei width, GLsizei height, GLint internalformat, int uninitialized) {
     // From https://registry.khronos.org/OpenGL-Refpages/gl4/html/glTexImage2D.xhtml:
     //  GL_INVALID_OPERATION is generated if internalformat is GL_DEPTH_COMPONENT, GL_DEPTH_COMPONENT16,
     //  GL_DEPTH_COMPONENT24, or GL_DEPTH_COMPONENT32F, and format is not GL_DEPTH_COMPONENT.
@@ -24,9 +25,38 @@ void uninitializedTexImage2D(GLenum target, GLint level, GLsizei width, GLsizei 
             break;
     }
 
-    // Otherwise, hopefully we can just tell OpenGL that at the null
-    // pointer there's a big bad scary RED BYTE, and it won't complain.
-    glTexImage2D(target, level, internalformat, width, height, 0, format, GL_BYTE, NULL);
+    void *data = NULL;
+    if (!uninitialized) {
+        // There are multiple ways to initialize a texture to 0, most of
+        // which are in some way affected by global GL state -- calloc'd
+        // image data feels cleanest to me, but we do need to be careful
+        // of alignment.
+
+        data = calloc((width+3)/4 * 4 * height, sizeof(GLbyte));
+
+        // Don't create an uninitialized texture when we wanted it zero
+        // initialized.  Some error eventually is better than no error.
+        if (!data) return;
+
+        // Ensure relevant GL state is actually set to default values.
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+        glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+        glPixelStorei(GL_UNPACK_IMAGE_HEIGHT, 0);
+
+        // "These values are provided as a convenience to the programmer"
+        // They are so "convenient" that unless you ALWAYS set them to 0
+        // before calling glTexImage2D, there is a small possibility
+        // that they could have been left set to some non-zero value by
+        // some previous code and result in memory access violations!
+        // (yeah ok, that'd really be a bug with whatever code set them,
+        // but still though...)
+        glPixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+        glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+    }
+
+    glTexImage2D(target, level, internalformat, width, height, 0, format, GL_BYTE, data);
+
+    if (!uninitialized) free(data);
 }
 
 
@@ -39,11 +69,11 @@ void uninitializedTexImage2D(GLenum target, GLint level, GLsizei width, GLsizei 
 //  another we will need them all in one FBO.
 //  Side note: even though I will have many FBOs with same textures of
 //  same width/height, I think there should only ever be one FBO per TFB
-int initTexturedFrameBuffer(TexturedFrameBuffer *tfb, GLsizei width, GLsizei height, GLint internalformat) {
+int initTexturedFrameBuffer(TexturedFrameBuffer *tfb, GLsizei width, GLsizei height, GLint internalformat, int uninitialized) {
     glGenTextures(1, &tfb->texture);
     glBindTexture(GL_TEXTURE_2D, tfb->texture);
 
-    uninitializedTexImage2D(GL_TEXTURE_2D, 0, width, height, internalformat);
+    emptyTexImage2D(GL_TEXTURE_2D, 0, width, height, internalformat, uninitialized);
 
     // Necessary to set MIN_FILTER as we have no mipmap layers
     // MAG_FILTER is linear by default, but might as well set both to be
@@ -57,6 +87,13 @@ int initTexturedFrameBuffer(TexturedFrameBuffer *tfb, GLsizei width, GLsizei hei
     //  GL_TEXTURE_MAX_LOD?
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // GL_CLAMP_TO_EDGE is a better default for the few times I actually use texture()
+    // Possibly for some cases a zero-boundary would be a bit better, so maybe in the future
+    // I'll want to make texture parameters easily customizable with a struct or something.
+    // But for now, I don't think there's a pressing need.
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
     tfb->width = width;
     tfb->height = height;
@@ -91,8 +128,8 @@ void deleteTexturedFrameBuffer(TexturedFrameBuffer *tfb) {
 }
 
 
-int initPyramidBuffer(PyramidBuffer *pbuf, GLsizei width, GLsizei height, GLint internalformat) {
-    PyramidLayer layers[32];  // GLsizei is specified to be 32 bits
+int initCeilPyramidBuffer(PaddedPyramidBuffer *pbuf, GLsizei width, GLsizei height, GLint internalformat, int uninitialized) {
+    PaddedPyramidLayer layers[32];  // GLsizei is specified to be 32 bits
     size_t numLayers = 0;
 
     if (SET_ERR_IF_TRUE(width < 1 || height < 1)) return 1;
@@ -102,20 +139,12 @@ int initPyramidBuffer(PyramidBuffer *pbuf, GLsizei width, GLsizei height, GLint 
         GLsizei paddedHeight = height & 1? height + 1 : height;
         if (width == 1 && height == 1) paddedWidth = paddedHeight = 1;
 
-        int err = initTexturedFrameBuffer(&layers[numLayers].buf, paddedWidth, paddedHeight, internalformat);
+        int err = initTexturedFrameBuffer(
+            &layers[numLayers].buf, paddedWidth, paddedHeight, internalformat,
+            uninitialized && paddedWidth == width && paddedHeight == height
+        );
+
         if (err) return err;
-        if (paddedWidth != width || paddedHeight != height) {
-            // TODO: this is a bit sketchy because "the scissor test,
-            //  dithering, and the buffer writemasks affect the
-            //  operation of glClear".  So whether or not the buffer
-            //  actually gets cleared and we actually get a border of 0
-            //  depends on a bunch of GL state being set correctly.
-            //  Possibly the better thing would be just to initialize
-            //  glTexImage2D with calloc'd data.
-            glBindFramebuffer(GL_FRAMEBUFFER, layers[numLayers].buf.fbo);
-            glClearColor(0.f, 0.f, 0.0f, 1.f);
-            glClear(GL_COLOR_BUFFER_BIT);
-        }
 
         layers[numLayers].dataWidth = width;
         layers[numLayers].dataHeight = height;
@@ -128,19 +157,54 @@ int initPyramidBuffer(PyramidBuffer *pbuf, GLsizei width, GLsizei height, GLint 
         height = (height + 1) / 2;
     };
 
-    size_t size = numLayers * sizeof(PyramidLayer);
+    size_t size = numLayers * sizeof(PaddedPyramidLayer);
     pbuf->layers = malloc(size);
     memcpy(pbuf->layers, layers, size);
-    pbuf->numLevels = numLayers;
+    pbuf->numLayers = numLayers;
+    return 0;
+}
+
+void deletePaddedPyramidBuffer(PaddedPyramidBuffer *pbuf) {
+    if (pbuf == NULL || pbuf->layers == NULL) return;
+    for (int i = 0; i < pbuf->numLayers; i++) {
+        deleteTexturedFrameBuffer(&pbuf->layers[i].buf);
+    }
+    free(pbuf->layers);
+    pbuf->layers = NULL;
+    pbuf->numLayers = 0;
+}
+
+
+int initRoofPyramidBuffer(PyramidBuffer *pbuf, GLsizei width, GLsizei height, GLint internalformat, int uninitialized) {
+    TexturedFrameBuffer layers[32];  // GLsizei is specified to be 32 bits
+    size_t numLayers = 0;
+
+    if (SET_ERR_IF_TRUE(width < 2 || height < 2)) return 1;
+    while (1) {
+        assert(numLayers < 32);
+
+        int err = initTexturedFrameBuffer(&layers[numLayers], width, height, internalformat, uninitialized);
+        if (err) return err;
+        numLayers++;
+
+        if (width <= 2 && height <= 2) break;
+        width = width / 2 + 1;
+        height = height / 2 + 1;
+    }
+
+    size_t size = numLayers * sizeof(TexturedFrameBuffer);
+    pbuf->layers = malloc(size);
+    memcpy(pbuf->layers, layers, size);
+    pbuf->numLayers = numLayers;
     return 0;
 }
 
 void deletePyramidBuffer(PyramidBuffer *pbuf) {
     if (pbuf == NULL || pbuf->layers == NULL) return;
-    for (int i = 0; i < pbuf->numLevels; i++) {
-        deleteTexturedFrameBuffer(&pbuf->layers[i].buf);
+    for (int i = 0; i < pbuf->numLayers; i++) {
+        deleteTexturedFrameBuffer(&pbuf->layers[i]);
     }
     free(pbuf->layers);
     pbuf->layers = NULL;
-    pbuf->numLevels = 0;
+    pbuf->numLayers = 0;
 }

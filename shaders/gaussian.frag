@@ -1,4 +1,4 @@
-#version 330
+#version 430
 // 2D Gaussian function centered at origin
 // Intended to be shifted and scaled by surface.vert
 

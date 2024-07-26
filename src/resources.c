@@ -8,16 +8,26 @@ ProgQTurn g_qturn = {.prog = {.name = "shaders/qturn.frag"}};
 ProgGaussian g_gaussian = {.prog = {.name = "shaders/gaussian.frag"}};
 ProgPDF g_pdf = {.prog = {.name = "shaders/pdf.frag"}};
 ProgRenderer g_renderer = {.prog = {.name = "shaders/graphics/renderer.frag"}};
+ProgDebugRenderer g_debugRenderer = {.prog = {.name = "shaders/graphics/debug.frag"}};
 ProgClubGraphics g_clubGfx = {.prog = {.name = "shaders/graphics/club.frag"}};
 ProgPutt g_putt = {.prog = {.name = "shaders/putt.frag"}};
 ProgCMul g_cmul = {.prog = {.name = "shaders/cmul.frag"}};
 ProgRSumReduce g_rsumReduce = {.prog = {.name = "shaders/rsum_reduce.frag"}};
+ProgInitLIP g_initLIP = {.prog = {.name = "shaders/drag/init_lip.comp"}};
+ProgBuildLIP g_buildLIP = {.prog = {.name = "shaders/drag/build_lip.comp"}};
+ProgLIPKiss g_LIPKiss = {.prog = {.name = "shaders/drag/lip_kiss.comp"}};
+ProgIntegrateLIP g_integrateLIP[2] = {
+    {.prog = {.name = "shaders/drag/integrate_lip_x.comp"}},
+    {.prog = {.name = "shaders/drag/integrate_lip_y.comp"}}
+};
 
 TexturedFrameBuffer g_potentialBuffer;
 TexturedFrameBuffer g_simBuffers[2];
 TexturedFrameBuffer g_puttBuffer;
 TexturedFrameBuffer g_pdfBuffer;
-PyramidBuffer g_pdfPyramid;
+PaddedPyramidBuffer g_pdfPyramid;
+PyramidBuffer g_dragLIP;
+TexturedFrameBuffer g_dragPot;
 
 static GLuint quadVAO = 0;
 static GLuint quadVBO = 0;
@@ -72,6 +82,7 @@ int loadResources() {
     EXPECT_UNIFORM(&g_qturn, u_dt);
     EXPECT_UNIFORM(&g_qturn, u_prev);
     EXPECT_UNIFORM(&g_qturn, u_potential);
+    EXPECT_UNIFORM(&g_qturn, u_dragPot);
 
     g_pdf.prog.id = compileAndLinkFragProgram(
         &identityShader, g_basePath, g_pdf.prog.name, "o_psi2"
@@ -96,6 +107,16 @@ int loadResources() {
     FIND_UNIFORM(&g_renderer, u_skybox);
     FIND_UNIFORM(&g_renderer, u_light);
 
+    g_debugRenderer.prog.id = compileAndLinkFragProgram(
+        &surfaceShader, g_basePath, g_debugRenderer.prog.name, "o_color"
+    );
+    if (g_debugRenderer.prog.id == 0) return 1;
+    // TODO: move common vertex uniform initialization elsewhere
+    EXPECT_UNIFORM(&g_debugRenderer.vert, u_scale);
+    EXPECT_UNIFORM(&g_debugRenderer.vert, u_shift);
+    EXPECT_UNIFORM(&g_debugRenderer, u_data);
+    FIND_UNIFORM(&g_debugRenderer, u_colormap);
+    FIND_UNIFORM(&g_debugRenderer, u_mode);
 
     g_clubGfx.prog.id = compileAndLinkFragProgram(
         &surfaceShader, g_basePath, g_clubGfx.prog.name, "o_color"
@@ -130,17 +151,42 @@ int loadResources() {
     if (g_rsumReduce.prog.id == 0) return 1;
     EXPECT_UNIFORM(&g_rsumReduce, u_src);
 
-    double aspect = 1.6;
-    int simHeight = 512;
+    g_initLIP.prog.id = compileAndLinkCompProgram(g_basePath, g_initLIP.prog.name);
+    if (g_initLIP.prog.id == 0) return 1;
+    EXPECT_UNIFORM(&g_initLIP, u_cur);
+    EXPECT_UNIFORM(&g_initLIP, u_prev);
+    EXPECT_UNIFORM(&g_initLIP, u_lipOut);
+    EXPECT_UNIFORM(&g_initLIP, u_simSize);
+
+    g_buildLIP.prog.id = compileAndLinkCompProgram(g_basePath, g_buildLIP.prog.name);
+    if (g_buildLIP.prog.id == 0) return 1;
+    EXPECT_UNIFORM(&g_buildLIP, u_lipIn);
+    EXPECT_UNIFORM(&g_buildLIP, u_lipOut);
+
+    g_LIPKiss.prog.id = compileAndLinkCompProgram(g_basePath, g_LIPKiss.prog.name);
+    if (g_LIPKiss.prog.id == 0) return 1;
+    EXPECT_UNIFORM(&g_LIPKiss, u_lipIn);
+    EXPECT_UNIFORM(&g_LIPKiss, u_potOut);
+
+    for (int i = 0; i < 2; i++) {
+        g_integrateLIP[i].prog.id = compileAndLinkCompProgram(g_basePath, g_integrateLIP[i].prog.name);
+        if (g_integrateLIP[i].prog.id == 0) return 1;
+        EXPECT_UNIFORM(&g_integrateLIP[i], u_lipIn);
+        EXPECT_UNIFORM(&g_integrateLIP[i], u_potOut);
+        EXPECT_UNIFORM(&g_integrateLIP[i], u_scale);
+    }
+
+    double aspect = 1.5;
+    int simHeight = 257;
     int simWidth = (int)(simHeight*aspect);
 
     for (int i = 0; i < 2; i++) {
-        err = initTexturedFrameBuffer(&g_simBuffers[i], simWidth, simHeight, GL_RG32F);
+        err = initTexturedFrameBuffer(&g_simBuffers[i], simWidth, simHeight, GL_RG32F, 1);
         if (err != 0) return err;
     }
 
 
-    err = initTexturedFrameBuffer(&g_potentialBuffer, simWidth, simHeight, GL_R32F);
+    err = initTexturedFrameBuffer(&g_potentialBuffer, simWidth, simHeight, GL_R32F, 1);
     if (err != 0) return err;
     // zero potential
     glBindFramebuffer(GL_FRAMEBUFFER, g_potentialBuffer.fbo);
@@ -148,18 +194,20 @@ int loadResources() {
     glClear(GL_COLOR_BUFFER_BIT);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    err = initTexturedFrameBuffer(&g_puttBuffer, simWidth, simHeight, GL_RG32F);
+    err = initTexturedFrameBuffer(&g_puttBuffer, simWidth, simHeight, GL_RG32F, 1);
     if (err != 0) return err;
 
-    err = initTexturedFrameBuffer(&g_pdfBuffer, simWidth, simHeight, GL_R32F);
+    err = initTexturedFrameBuffer(&g_pdfBuffer, simWidth, simHeight, GL_R32F, 1);
     if (err != 0) return err;
 
-    err = initPyramidBuffer(&g_pdfPyramid, simWidth, simHeight, GL_R32F);
+    err = initCeilPyramidBuffer(&g_pdfPyramid, simWidth, simHeight, GL_R32F, 1);
     if (err != 0) return err;
 
-    // for (int i = 0; i < g_pdfPyramid.numLevels; i++) {
-    //     SDL_Log("%d, %d, %d, %d", g_pdfPyramid.layers[i].dataWidth, g_pdfPyramid.layers[i].dataHeight, g_pdfPyramid.layers[i].buf.width, g_pdfPyramid.layers[i].buf.height);
-    // }
+    err = initRoofPyramidBuffer(&g_dragLIP, simWidth, simHeight, GL_RG32F, 0);
+    if (err != 0) return err;
+
+    err = initTexturedFrameBuffer(&g_dragPot, simWidth, simHeight, GL_R32F, 1);
+    if (err != 0) return err;
 
 
     if (g_renderer.u_skybox != -1) {
@@ -219,7 +267,9 @@ void freeResources() {
     glDeleteTextures(1, &g_skyboxTexture);
     g_skyboxTexture = 0;
 
-    deletePyramidBuffer(&g_pdfPyramid);
+    deleteTexturedFrameBuffer(&g_dragPot);
+    deletePyramidBuffer(&g_dragLIP);
+    deletePaddedPyramidBuffer(&g_pdfPyramid);
     deleteTexturedFrameBuffer(&g_pdfBuffer);
     deleteTexturedFrameBuffer(&g_puttBuffer);
     deleteTexturedFrameBuffer(&g_potentialBuffer);
