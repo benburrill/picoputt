@@ -28,7 +28,7 @@ static int paused = 0;
 static int debugView = 0;
 static size_t debugViewIdx = 0;
 static SDL_Point puttStart;
-static SDL_Rect displayArea;
+static SDL_Rect drDisplayArea;
 float displayScale;
 
 // Note: when we make potential time-dep we will almost certainly want a
@@ -158,20 +158,18 @@ int doPhysics(int turnsNeeded, double maxTime) {
         glUseProgram(g_buildLIP.prog.id);
         int prevBound = 0;
         for (int i = 1; i < g_dragLIP.numLayers; i++) {
-            // TODO: why this no work...
-            // glBindImageTexture(3 - prevBound, g_dragLIP.layers[i].texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F);
-            // glUniform1i(g_buildLIP.u_lipIn, 2 + prevBound);
-            // glUniform1i(g_buildLIP.u_lipOut, 3 - prevBound);
-
-            // ... but this does:
-            // glBindImageTexture(2, g_dragLIP.layers[i - 1].texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F);
-            // glBindImageTexture(3, g_dragLIP.layers[i].texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F);
-            // glUniform1i(g_buildLIP.u_lipIn, 2);
-            // glUniform1i(g_buildLIP.u_lipOut, 3);
-
-            // Even this works... wtf?  It should be literally the same, just with a redundant bind
-            // It seems that without the "redundant" bind, u_lipIn stays stuck on g_dragLIP.layers[0]
-            // u_lipOut changes (as it should) to g_dragLIP.layers[i] though
+            // This first image bind *should* be redundant so far as I can tell from the OpenGL spec because the same
+            // texture should already be bound to the same image unit.  However, in some OpenGL implementations, it is
+            // necessary to rebind the image (presumably due to a bug).
+            //
+            // Tested implementations (GL_RENDERER):
+            //  * AMD Radeon(TM) Graphics on Windows: rebind is needed
+            //    - It seems that without the "redundant" bind, u_lipIn somehow stays stuck on g_dragLIP.layers[0].
+            //    - u_lipOut still changes (as it should) to g_dragLIP.layers[i] though.
+            //    - So basically the corner of g_dragLIP.layers[1] gets copied to all levels.
+            //    - Qualitatively, this "disables drag" as the top level line integrals are too small to be noticeable.
+            //  * Mesa Intel(R) UHD Graphics 620 (KBL GT2) on Linux: rebind is not needed
+            //    - Works fine either way, and there's no measurable performance penalty to doing the redundant bind.
             glBindImageTexture(2 + prevBound, g_dragLIP.layers[i - 1].texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F);
             glBindImageTexture(3 - prevBound, g_dragLIP.layers[i].texture, 0, GL_FALSE, 0, GL_READ_WRITE, GL_RG32F);
             glUniform1i(g_buildLIP.u_lipIn, 2 + prevBound);
@@ -194,8 +192,6 @@ int doPhysics(int turnsNeeded, double maxTime) {
         glDispatchCompute(1, 1, 1);
         glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-        processGlErrors("after blah");
-
         for (int i = g_dragLIP.numLayers - 2; i >= 0; i--) {
             int scale = 1 << i;
             int numX, numY;
@@ -211,7 +207,6 @@ int doPhysics(int turnsNeeded, double maxTime) {
 
                 glDispatchCompute((numX + 7)/8, (numY + 7)/8, 1);
                 glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-                if (processGlErrors("after integrate_lip_x")) printf("i: %d, w: %d, h: %d, wgx: %d, wgy: %d, numX: %d, numY: %d\n", i, g_dragLIP.layers[i].width, g_dragLIP.layers[i].height, (numX + 7)/8, (numY + 7)/8, numX, numY);
             }
 
             numX = g_dragLIP.layers[i].width;
@@ -224,7 +219,6 @@ int doPhysics(int turnsNeeded, double maxTime) {
 
                 glDispatchCompute((numX + 7)/8, (numY + 7)/8, 1);
                 glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-                if (processGlErrors("after integrate_lip_y")) printf("i: %d, w: %d, h: %d, wgx: %d, wgy: %d\n", i, g_dragLIP.layers[i].width, g_dragLIP.layers[i].height, (numX + 7)/8, (numY + 7)/8);
             }
         }
 
@@ -318,22 +312,22 @@ void applyPutt() {
 
 void updateDisplayInfo() {
     double simAspect = (double)g_simBuffers[0].width / (double)g_simBuffers[0].height;
-    displayArea.w = (int) (g_height * simAspect);
-    displayArea.h = g_height;
-    if (displayArea.w > g_width) {
-        displayArea.w = g_width;
-        displayArea.h = (int) (g_width / simAspect);
+    drDisplayArea.w = (int) (g_drHeight * simAspect);
+    drDisplayArea.h = g_drHeight;
+    if (drDisplayArea.w > g_drWidth) {
+        drDisplayArea.w = g_drWidth;
+        drDisplayArea.h = (int) (g_drWidth / simAspect);
     }
 
-    displayArea.x = (g_width - displayArea.w)/2;
-    displayArea.y = (g_height - displayArea.h)/2;
-    displayScale = (float)displayArea.w / (float)g_simBuffers[0].width;
+    drDisplayArea.x = (g_drWidth - drDisplayArea.w) / 2;
+    drDisplayArea.y = (g_drHeight - drDisplayArea.h) / 2;
+    displayScale = (float)drDisplayArea.w / (float)g_simBuffers[0].width;
 }
 
-SDL_FPoint simPixelPos(SDL_Point screenPos) {
+SDL_FPoint simPixelPos(SDL_Point drPos) {
     return (SDL_FPoint) {
-        .x = (float)(screenPos.x - displayArea.x) / displayScale,
-        .y = (float)(displayArea.h - screenPos.y - displayArea.y) / displayScale
+        .x = (float)(drPos.x - drDisplayArea.x) / displayScale,
+        .y = (float)(drDisplayArea.h - drPos.y - drDisplayArea.y) / displayScale
     };
 }
 
@@ -348,22 +342,23 @@ SDL_FPoint simPixelPos(SDL_Point screenPos) {
 //     even though where possible, we really want to be working in
 //     screen-scaled coordinates rather than draw-scaled coordinates
 //     Maybe display rect should be floating point screen coords?
-void uniformDisplayRelative(ProgSurface prog, float scale, SDL_Point centerScreen) {
-    glUniform2f(prog.u_scale, scale * (float)displayArea.w, scale * (float)displayArea.h);
+void uniformDisplayRelative(ProgSurface prog, float scale, SDL_Point drCenter) {
+    glUniform2f(prog.u_scale, scale * (float)drDisplayArea.w, scale * (float)drDisplayArea.h);
     glUniform2f(
         prog.u_shift,
-        -scale * (float)(centerScreen.x - displayArea.x),
-        -scale * (float)(displayArea.h - centerScreen.y - displayArea.y)
+        -scale * (float)(drCenter.x - drDisplayArea.x),
+        -scale * (float)(drDisplayArea.h - drCenter.y - drDisplayArea.y)
     );
 }
 
 void renderDebug(GLuint texture, float a, float b, float c, float d) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, g_drWidth, g_drHeight);
 
     glClearColor(0.8f, 0.8f, 0.8f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glViewport(displayArea.x, displayArea.y, displayArea.w, displayArea.h);
+    glViewport(drDisplayArea.x, drDisplayArea.y, drDisplayArea.w, drDisplayArea.h);
     glUseProgram(g_debugRenderer.prog.id);
 
     glUniform2f(g_debugRenderer.vert.u_scale, 1.f, 1.f);
@@ -383,11 +378,12 @@ void renderDebug(GLuint texture, float a, float b, float c, float d) {
 
 void render() {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, g_drWidth, g_drHeight);
 
     glClearColor(0.8f, 0.8f, 0.8f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    glViewport(displayArea.x, displayArea.y, displayArea.w, displayArea.h);
+    glViewport(drDisplayArea.x, drDisplayArea.y, drDisplayArea.w, drDisplayArea.h);
     glUseProgram(g_renderer.prog.id);
 
     glUniform2f(
@@ -424,9 +420,9 @@ void render() {
 
     SDL_Point mouse;
     SDL_GetMouseState(&mouse.x, &mouse.y);
-    float lx = (float)g_width/2 - (float)mouse.x;
-    float ly = (float)mouse.y - (float)g_height/2;
-    float lz = -0.2f*(float)g_width;
+    float lx = (float)g_scWidth / 2 - (float)mouse.x;
+    float ly = (float)mouse.y - (float)g_scHeight / 2;
+    float lz = -0.2f*(float)g_scWidth;
     float mag = sqrtf(lx*lx + ly*ly + lz*lz);
     glUniform3f(g_renderer.u_light, lx/mag, ly/mag, lz/mag);
 
@@ -480,6 +476,60 @@ SDL_Point samplePyramid(PaddedPyramidBuffer *pbuf) {
     }
 
     return (SDL_Point) {.x = x, .y = y};
+}
+
+
+#define FPS_HISTORY 8
+void renderFPS(double fps) {
+    float pixels = (float)g_simBuffers[0].width * (float)g_simBuffers[0].height;
+
+    static int histIdx = 0;
+    static int needsInit = 1;
+    static double fpsHist[FPS_HISTORY];
+    static double mtpsHist[FPS_HISTORY];
+    if (needsInit) {
+        for (int i = 0; i < FPS_HISTORY; i++) {
+            fpsHist[i] = fps;
+            mtpsHist[i] = maxTurnsPerSecond;
+        }
+        needsInit = 0;
+    } else {
+        fpsHist[histIdx] = fps;
+        mtpsHist[histIdx] = maxTurnsPerSecond;
+        histIdx = (histIdx + 1)%FPS_HISTORY;
+    }
+
+    double avgFPS = 0.;
+    double avgMTPS = 0.;
+    for (int i = 0; i < FPS_HISTORY; i++) {
+        avgFPS += fpsHist[i];
+        avgMTPS += mtpsHist[i];
+    }
+    avgFPS /= FPS_HISTORY;
+    avgMTPS /= FPS_HISTORY;
+
+    char *text;
+    if (SDL_asprintf(
+        &text, "%.f FPS | max perf: %.f T/s (%.f MpxT/s)",
+        avgFPS, avgMTPS, pixels * avgMTPS / 1e6
+    ) == -1) return;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, g_drWidth, g_drHeight);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    useFont(&g_fontRegular, (ProgDrawGlyph*)&g_msdfGlyph, 0);
+    glUniform4f(g_msdfGlyph.u_color, 0.f, 0.f, 0.f, 1.f);
+    Cursor c = {
+        .left=5.f, .x=5.f, .y=5.f, .size=15.f,
+        .viewWidth=(float)g_scWidth, .viewHeight=(float)g_scHeight
+    };
+
+    drawStringFixedNum(&c, text);
+    glDisable(GL_BLEND);
+
+    SDL_free(text);
 }
 
 
@@ -547,9 +597,12 @@ int gameLoop() {
 
         // if (frame == 0) paused = 1;
         if (debugView) {
-            if (debugViewIdx % 2 == 0) renderDebug(g_dragPot.texture, 5e-2f, 0.f, 0.f, 0.f);
-            else renderDebug(g_dragLIP.layers[0].texture, 1e-3f, 0.f, 0.f, 0.f);
+            if (debugViewIdx % 3 == 0) renderDebug(g_dragPot.texture, 5e-2f, 0.f, 0.f, 0.f);
+            else if (debugViewIdx % 3 == 1) renderDebug(g_dragLIP.layers[0].texture, 1e-3f, 0.f, 0.f, 0.f);
+            else renderDebug(g_simBuffers[curBuf].texture, 1e-3f, 0.f, 0.f, 0.f);
         } else render();
+
+        renderFPS(1./frameDuration);
 
         SDL_Event e;
         while (SDL_PollEvent(&e)) switch (e.type) {
@@ -563,6 +616,8 @@ int gameLoop() {
                 // TODO: maybe use SDL_SetRelativeMouseMode(SDL_TRUE) in putt mode
                 puttActive = 1;
                 puttPhase = 0.f;
+                // TODO: I believe that SDL_GetMouseState gives results in screen coordinates,
+                //  but we treat them as if they are in draw coordinates
                 SDL_GetMouseState(&puttStart.x, &puttStart.y);
                 break;
             case SDL_MOUSEBUTTONUP:
@@ -576,10 +631,10 @@ int gameLoop() {
                         1./frameDuration, skippedTurns, perfQueryTurns / frameDuration, maxTurnsPerSecond
                     );
 
-                    // float totalProb;
-                    // glBindFramebuffer(GL_FRAMEBUFFER, g_pdfPyramid.layers[g_pdfPyramid.numLayers - 1].buf.fbo);
-                    // glReadPixels(0, 0, 1, 1, GL_RED, GL_FLOAT, &totalProb);
-                    // SDL_Log("totalProb: %f", totalProb);
+                    float totalProb;
+                    glBindFramebuffer(GL_FRAMEBUFFER, g_pdfPyramid.layers[g_pdfPyramid.numLayers - 1].buf.fbo);
+                    glReadPixels(0, 0, 1, 1, GL_RED, GL_FLOAT, &totalProb);
+                    SDL_Log("totalProb: %f", totalProb);
                 } else if (e.key.keysym.sym == SDLK_p) {
                     paused = !paused;
                 } else if (e.key.keysym.sym == SDLK_d) {

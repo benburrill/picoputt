@@ -101,3 +101,54 @@ void logGlErrors() {
         glErrorStatus >>= 1;
     }
 }
+
+
+static GLuint quadVAO = 0;
+static GLuint quadVBO = 0;
+
+void drawQuad() {
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+}
+
+void initQuad() {
+    if (quadVAO) return;
+    GLfloat vertAttribs[] = {
+        // NDC coordinates       UV coordinates
+        // Triangle 1
+        -1.f, -1.f,            0.f, 0.f,
+        +1.f, -1.f,            1.f, 0.f,
+        +1.f, +1.f,            1.f, 1.f,
+
+        // Triangle 2
+        -1.f, -1.f,            0.f, 0.f,
+        +1.f, +1.f,            1.f, 1.f,
+        -1.f, +1.f,            0.f, 1.f
+    };
+
+    GLsizei stride = 4 * sizeof(GLfloat);
+    void *offsetNDC = (void *) 0;
+    void *offsetUV = (void *) (2 * sizeof(GLfloat));
+
+    glGenBuffers(1, &quadVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof vertAttribs, vertAttribs, GL_STATIC_DRAW);
+
+    glGenVertexArrays(1, &quadVAO);
+    glBindVertexArray(quadVAO);
+
+    glVertexAttribPointer(ATTR_IDX_NDC, 2, GL_FLOAT, GL_FALSE, stride, offsetNDC);
+    glEnableVertexAttribArray(ATTR_IDX_NDC);
+
+    glVertexAttribPointer(ATTR_IDX_UV, 2, GL_FLOAT, GL_FALSE, stride, offsetUV);
+    glEnableVertexAttribArray(ATTR_IDX_UV);
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
+void destroyQuad() {
+    glDeleteVertexArrays(1, &quadVAO);
+    glDeleteBuffers(1, &quadVBO);
+    quadVAO = 0;
+}

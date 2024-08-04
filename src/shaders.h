@@ -2,6 +2,24 @@
 #define PICOPUTT_SHADERS_H
 #include <GL/glew.h>
 
+#define FIND_UNIFORM(p, u) \
+    ((p)->u = glGetUniformLocation((p)->prog.id, #u))
+
+// For similar reasons as buildProgramFromShaders, I don't actually want
+// to produce an error if expected uniforms are inactive, but this macro
+// will load the uniform location into the program struct and warn if it
+// is inactive.
+#define EXPECT_UNIFORM(p, u) \
+    ((void) (FIND_UNIFORM(p, u) == -1 && \
+    (SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, \
+        "Uniform %s is not active in program %s", \
+        #u, (p)->prog.name), 1)))
+
+typedef struct {
+    GLuint id;
+    const char *name;
+} Program;
+
 typedef struct {
     const char *varName;
     GLuint location;

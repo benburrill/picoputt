@@ -1,12 +1,10 @@
 # Picoputt
 Taking the concept of miniature golf to its logical extreme, in picoputt your golf ball is a quantum particle.
 
-Currently, it is not so much an actual game as it is an interactive simulation/toy, and I'm still working on porting
-some key features from my Python prototype (also not a complete game) to C/GLSL.
+Currently, it is more of an interactive simulation/toy rather than a game, as there's not yet a way to win.
 
-Currently, picoputt has the following features:
-* Fast, GPU-accelerated simulation of the Schrödinger equation.  On my laptop's integrated GPU, it's ~60x faster than
-  the equivalent Python/numpy implementation from my prototype.
+However, the following features have been implemented:
+* Fast, GPU-accelerated simulation of the time-dependent Schrödinger equation.
 * Putting: hit the quantum golf-ball around using a golf club "putt-wave" with adjustable radius.
 * Measurement of position (though it's currently not implemented as a proper partial measurement).
 * Energy dissipation with quantum analog to a linear drag force.

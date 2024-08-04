@@ -3,6 +3,7 @@
 #include "game.h"
 #include "shaders.h"
 #include "utils.h"
+#include "text.h"
 
 ProgQTurn g_qturn = {.prog = {.name = "shaders/qturn.frag"}};
 ProgGaussian g_gaussian = {.prog = {.name = "shaders/gaussian.frag"}};
@@ -20,6 +21,7 @@ ProgIntegrateLIP g_integrateLIP[2] = {
     {.prog = {.name = "shaders/drag/integrate_lip_x.comp"}},
     {.prog = {.name = "shaders/drag/integrate_lip_y.comp"}}
 };
+ProgDrawMSDFGlyph g_msdfGlyph = {.prog = {.name = "shaders/text/msdf.frag"}};
 
 TexturedFrameBuffer g_potentialBuffer;
 TexturedFrameBuffer g_simBuffers[2];
@@ -29,30 +31,28 @@ PaddedPyramidBuffer g_pdfPyramid;
 PyramidBuffer g_dragLIP;
 TexturedFrameBuffer g_dragPot;
 
-static GLuint quadVAO = 0;
-static GLuint quadVBO = 0;
+Font g_fontRegular;
 
 GLuint g_skyboxTexture = 0;
 GLuint g_colormapTexture = 0;
 
-#define ATTR_IDX_NDC 0
-#define ATTR_IDX_UV 1
-VariableBinding defaultAttribVars[] = {
-    {"a_ndc", ATTR_IDX_NDC},
-    {"a_uv", ATTR_IDX_UV}
-};
-
 static Shader identityShader = {
-    .id = 0, .name = "shaders/identity.vert",
-    .numReqVars = 1, .reqVars = defaultAttribVars
+    .name = "shaders/identity.vert",
+    .numReqVars = 1, .reqVars = (VariableBinding[]) {VAR_BIND_NDC}
 };
 
 static Shader surfaceShader = {
-    .id = 0, .name = "shaders/surface.vert",
-    .numReqVars = 2, .reqVars = defaultAttribVars
+    .name = "shaders/surface.vert",
+    .numReqVars = 2, .reqVars = (VariableBinding[]) {
+        VAR_BIND_NDC, VAR_BIND_UV
+    }
 };
 
-static void initQuad();
+static Shader glyphVertShader = {
+    .name = "shaders/text/glyph.vert",
+    .numReqVars = 1, .reqVars = (VariableBinding[]) {VAR_BIND_UV}
+};
+
 int loadResources() {
     int err;
     initQuad();
@@ -62,6 +62,9 @@ int loadResources() {
 
     surfaceShader.id = loadShader(GL_VERTEX_SHADER, g_basePath, surfaceShader.name);
     if (surfaceShader.id == 0) return 1;
+
+    glyphVertShader.id = loadShader(GL_VERTEX_SHADER, g_basePath, glyphVertShader.name);
+    if (glyphVertShader.id == 0) return 1;
 
     g_gaussian.prog.id = compileAndLinkFragProgram(
         &surfaceShader, g_basePath, g_gaussian.prog.name, "o_psi"
@@ -176,6 +179,16 @@ int loadResources() {
         EXPECT_UNIFORM(&g_integrateLIP[i], u_scale);
     }
 
+    g_msdfGlyph.prog.id = compileAndLinkFragProgram(&glyphVertShader, g_basePath, g_msdfGlyph.prog.name, "o_color");
+    if (g_msdfGlyph.prog.id == 0) return 1;
+    EXPECT_UNIFORM(&g_msdfGlyph.base, u_atlas);
+    EXPECT_UNIFORM(&g_msdfGlyph.base, u_ndcPos);
+    EXPECT_UNIFORM(&g_msdfGlyph.base, u_ndcSize);
+    EXPECT_UNIFORM(&g_msdfGlyph.base, u_atlasPos);
+    EXPECT_UNIFORM(&g_msdfGlyph.base, u_atlasSize);
+    FIND_UNIFORM(&g_msdfGlyph.base, u_pxrange);
+    EXPECT_UNIFORM(&g_msdfGlyph, u_color);
+
     double aspect = 1.5;
     int simHeight = 257;
     int simWidth = (int)(simHeight*aspect);
@@ -258,10 +271,15 @@ int loadResources() {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
 
+    if ((err = loadFont(&g_fontRegular, g_basePath, "images/fonts/regular", '?', 8.f)))
+        return err;
+
     return 0;
 }
 
 void freeResources() {
+    destroyFont(&g_fontRegular);
+
     glDeleteTextures(1, &g_colormapTexture);
     g_colormapTexture = 0;
     glDeleteTextures(1, &g_skyboxTexture);
@@ -281,47 +299,4 @@ void freeResources() {
     glDeleteProgram(g_gaussian.prog.id);
     glDeleteShader(identityShader.id);
     glDeleteShader(surfaceShader.id);
-    glDeleteVertexArrays(1, &quadVAO);
-    glDeleteBuffers(1, &quadVBO);
-}
-
-
-void drawQuad() {
-    glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
-}
-
-static void initQuad() {
-    GLfloat vertAttribs[] = {
-        // NDC coordinates       UV coordinates
-        // Triangle 1
-        -1.f, -1.f,            0.f, 0.f,
-        +1.f, -1.f,            1.f, 0.f,
-        +1.f, +1.f,            1.f, 1.f,
-
-        // Triangle 2
-        -1.f, -1.f,            0.f, 0.f,
-        +1.f, +1.f,            1.f, 1.f,
-        -1.f, +1.f,            0.f, 1.f
-    };
-
-    GLsizei stride = 4 * sizeof(GLfloat);
-    void *offsetNDC = (void *) 0;
-    void *offsetUV = (void *) (2 * sizeof(GLfloat));
-
-    glGenBuffers(1, &quadVBO);
-    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof vertAttribs, vertAttribs, GL_STATIC_DRAW);
-
-    glGenVertexArrays(1, &quadVAO);
-    glBindVertexArray(quadVAO);
-
-    glVertexAttribPointer(ATTR_IDX_NDC, 2, GL_FLOAT, GL_FALSE, stride, offsetNDC);
-    glEnableVertexAttribArray(ATTR_IDX_NDC);
-
-    glVertexAttribPointer(ATTR_IDX_UV, 2, GL_FLOAT, GL_FALSE, stride, offsetUV);
-    glEnableVertexAttribArray(ATTR_IDX_UV);
-
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }

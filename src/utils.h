@@ -8,6 +8,15 @@ char *getGlErrorString(GLenum errCode);
 int processGlErrors(const char *info);
 void logGlErrors();
 
+// TODO: restructure things better, this is nasty
+#define ATTR_IDX_NDC 0
+#define VAR_BIND_NDC ((VariableBinding) {"a_ndc", ATTR_IDX_NDC})
+#define ATTR_IDX_UV 1
+#define VAR_BIND_UV ((VariableBinding) {"a_uv", ATTR_IDX_UV})
+void drawQuad();
+void initQuad();
+void destroyQuad();
+
 // Intended usage: if (SET_ERR_IF_TRUE(bad stuff)) return error code;
 // If the condition is true, it calls SDL_SetError with some debug info.
 // This is intended for errors the player probably can't fix (so don't

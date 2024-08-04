@@ -4,24 +4,8 @@
 #include <SDL.h>
 #include "shaders.h"
 #include "framebuffers.h"
+#include "text.h"
 
-#define FIND_UNIFORM(p, u) \
-    ((p)->u = glGetUniformLocation((p)->prog.id, #u))
-
-// For similar reasons as buildProgramFromShaders, I don't actually want
-// to produce an error if expected uniforms are inactive, but this macro
-// will load the uniform location into the program struct and warn if it
-// is inactive.
-#define EXPECT_UNIFORM(p, u) \
-    ((void) (FIND_UNIFORM(p, u) == -1 && \
-    (SDL_LogWarn(SDL_LOG_CATEGORY_APPLICATION, \
-        "Uniform %s is not active in program %s", \
-        #u, (p)->prog.name), 1)))
-
-typedef struct {
-    GLuint id;
-    const char *name;
-} Program;
 
 typedef struct {
     Program prog;
@@ -172,6 +156,16 @@ typedef struct {
 } ProgIntegrateLIP;
 extern ProgIntegrateLIP g_integrateLIP[2];
 
+typedef struct {
+    union {
+        Program prog;
+        ProgDrawGlyph base;
+    };
+
+    GLint u_color;
+} ProgDrawMSDFGlyph;
+extern ProgDrawMSDFGlyph g_msdfGlyph;
+
 // TODO: for time-dep pots we probably want 2 buffers so we precompute
 //  the next potential while we're using the current one
 extern TexturedFrameBuffer g_potentialBuffer;
@@ -183,6 +177,8 @@ extern PyramidBuffer g_dragLIP;
 extern TexturedFrameBuffer g_dragPot;
 extern GLuint g_skyboxTexture;
 extern GLuint g_colormapTexture;
+
+extern Font g_fontRegular;
 
 int loadResources();
 void freeResources();

@@ -4,5 +4,5 @@
 int gameLoop();
 float clubPixSize();
 void updateDisplayInfo();
-void uniformDisplayRelative(ProgSurface prog, float scale, SDL_Point centerScreen);
+void uniformDisplayRelative(ProgSurface prog, float scale, SDL_Point drCenter);
 #endif //PICOPUTT_LOOP_H

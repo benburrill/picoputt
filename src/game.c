@@ -10,9 +10,10 @@
 char *g_basePath = NULL;
 SDL_Window *g_window = NULL;
 SDL_GLContext g_GLContext = NULL;
-int g_width;
-int g_height;
-
+int g_scWidth;
+int g_scHeight;
+int g_drWidth;
+int g_drHeight;
 
 // startGame should set a SDL error on failure.
 // We are also adding additional context to SDL errors to try to make
@@ -39,15 +40,19 @@ int startGame() {
 
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
 
-    // TODO: g_width and g_height probably should be from SDL_GL_GetDrawableSize
-    g_width = 960;
-    g_height = 640;
+    g_scWidth = 960;
+    g_scHeight = 640;
     g_window = SDL_CreateWindow(
         "picoputt",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
-        g_width, g_height,
+        g_scWidth, g_scHeight,
         SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL
     );
+
+    // For now, I'm not actually using SDL_WINDOW_ALLOW_HIGHDPI, so
+    // draw units and screen units should be the same, but we will try
+    // to correctly distinguish between the two regardless.
+    SDL_GL_GetDrawableSize(g_window, &g_drWidth, &g_drHeight);
 
     if (g_window == NULL) {
         SDL_SetError("SDL_CreateWindow() failed: %s", SDL_GetError());
@@ -83,6 +88,7 @@ int startGame() {
         SDL_GL_SetSwapInterval(1);
     }
 
+    initQuad();
     return loadResources();
 }
 
@@ -91,6 +97,7 @@ int startGame() {
 void quitGame() {
     logGlErrors();
     freeResources();
+    destroyQuad();
 
     if (g_GLContext != NULL) {
         SDL_GL_DeleteContext(g_GLContext);

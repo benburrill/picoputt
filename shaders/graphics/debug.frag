@@ -10,5 +10,5 @@ uniform vec4 u_mode;       // Generic contextual information
 
 void main() {
     vec2 data = texture(u_data, v_pos).rg/u_mode.r;
-    o_color = vec4(-data.x, data.x, 0., 1.);
+    o_color = vec4(-data.x, data.x, abs(data.y), 1.);
 }
