@@ -8,7 +8,6 @@
 #include "resources.h"
 
 #define PHYS_TURNS_PER_SECOND 400
-// #define PHYS_TURNS_PER_SECOND 1
 
 // This is misleadingly named, FPS can go lower than this.
 // But the number of physics turns per frame is throttled so that the
@@ -21,15 +20,22 @@ float dt = 0.1f;
 float dx = 1.f;
 float mass = 1.f;
 
+static float winThreshold = 0.5f;
+
 static float clubSize = 0.25f;
+static int gameWon = 0;
 static int puttActive = 0;
 static float puttPhase = 0.f;
 static int paused = 0;
 static int debugView = 0;
+static int score = 0;
+static int par = 5;
 static size_t debugViewIdx = 0;
 static SDL_Point puttStart;
 static SDL_Rect drDisplayArea;
 float displayScale;
+static float initialSigma;
+static SDL_FPoint holePos;
 
 // Note: when we make potential time-dep we will almost certainly want a
 // separate variable to keep track of which potential buffer is current.
@@ -40,7 +46,35 @@ double perfQueryTurns;  // Number of turns (nominally 4 qturns) recorded in last
 double maxTurnsPerSecond = (double)PHYS_TURNS_PER_SECOND;
 
 
-void initPhysics(float x0, float y0) {
+void setGaussianWavepacket(TexturedFrameBuffer *tfb, float x0, float y0, float sigma, float dx_) {
+    // Initializes the tfb with a normalized gaussian wavepacket
+    // psi = A*exp(-0.5((x-x0)^2+(y-y0)^2)/sigma^2)
+    // (with normalization constant A = 1/(sigma*sqrt(pi)))
+    // NOTE: The name sigma may be misleading: sigma is NOT the standard
+    // deviation of the PDF!  It is sqrt(2) times the standard deviation
+    // since the PDF is the wavefunction squared.
+    glBindFramebuffer(GL_FRAMEBUFFER, tfb->fbo);
+    glViewport(0, 0, tfb->width, tfb->height);
+
+    glUseProgram(g_gaussian.prog.id);
+    float width = dx_ * (float)g_simBuffers[0].width;
+    float height = dx_ * (float)g_simBuffers[0].height;
+    glUniform2f(g_gaussian.vert.u_scale, width/sigma, height/sigma);
+    glUniform2f(g_gaussian.vert.u_shift, -x0/sigma, -y0/sigma);
+    glUniform1f(g_gaussian.u_peak, 1.f/(1.7725f*sigma));
+    drawQuad();
+}
+
+
+void initPhysics(float x0, float y0, float sigma) {
+    setGaussianWavepacket(&g_simBuffers[0], x0, y0, sigma, dx);
+
+    // Set drag potential to zero
+    glBindFramebuffer(GL_FRAMEBUFFER, g_dragPot.fbo);
+    glViewport(0, 0, g_dragPot.width, g_dragPot.height);
+    glClearColor(0.f, 0.f, 0.0f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
     // Expects perfQuery to be initialized
     glBindFramebuffer(GL_FRAMEBUFFER, g_simBuffers[0].fbo);
     // Note to self: translating glViewport with x and y doesn't affect
@@ -48,16 +82,6 @@ void initPhysics(float x0, float y0) {
     // https://www.khronos.org/opengl/wiki/Vertex_Post-Processing#Viewport_transform
     // Also it's not guaranteed to clip.  You need scissor for that.
     glViewport(0, 0, g_simBuffers[0].width, g_simBuffers[0].height);
-    glUseProgram(g_gaussian.prog.id);
-
-    float width = dx * (float)g_simBuffers[0].width;
-    float height = dx * (float)g_simBuffers[0].height;
-    float sigma = 0.03f * height;
-
-    glUniform2f(g_gaussian.vert.u_scale, width/sigma, height/sigma);
-    glUniform2f(g_gaussian.vert.u_shift, -x0/sigma, -y0/sigma);
-    glUniform1f(g_gaussian.u_peak, 1.f/(1.7725f*sigma));
-    drawQuad();
 
     glUseProgram(g_qturn.prog.id);
     glUniform1f(g_qturn.u_4m_dx2, 4.f * mass * dx * dx);
@@ -75,13 +99,18 @@ void initPhysics(float x0, float y0) {
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, g_potentialBuffer.texture);
 
-    // TODO: u_dragPot
+    glUniform1i(g_qturn.u_dragPot, 3);
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, g_dragPot.texture);
+
+    glUniform1i(g_qturn.u_wall, 4);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, g_wallBuffer.texture);
 
     drawQuad();
     glEndQuery(GL_TIME_ELAPSED);
-    // In the future, I'll be doing more stuff than just 4 qturns in a
-    // turn, so although 1 qturn = 1/4 turn is true physically speaking,
-    // it may be a bit optimistic from a performance perspective.
+    // 1 qturn = 1/4 turn is true physically speaking, although it's
+    // pretty optimistic since it doesn't account for drag update, etc.
     // But it'll only affect the first frame, so doesn't really matter.
     perfQueryTurns = 0.25;
 
@@ -94,6 +123,19 @@ void initPhysics(float x0, float y0) {
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     updateDisplayInfo();
+}
+
+
+void pyramidReduce(ProgReduce *reduction, PaddedPyramidBuffer *pyramid, GLint texUnit) {
+    glUseProgram(reduction->prog.id);
+    glUniform1i(reduction->u_src, texUnit);
+    glActiveTexture(GL_TEXTURE0 + texUnit);
+    for (int i = 1; i < pyramid->numLayers; i++) {
+        glBindFramebuffer(GL_FRAMEBUFFER, pyramid->layers[i].buf.fbo);
+        glViewport(0, 0, pyramid->layers[i].dataWidth, pyramid->layers[i].dataHeight);
+        glBindTexture(GL_TEXTURE_2D, pyramid->layers[i - 1].buf.texture);
+        drawQuad();
+    }
 }
 
 
@@ -117,6 +159,8 @@ int doPhysics(int turnsNeeded, double maxTime) {
     glBindTexture(GL_TEXTURE_2D, g_potentialBuffer.texture);
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D, g_dragPot.texture);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, g_wallBuffer.texture);
 
     GLint queryDone;
     glGetQueryObjectiv(perfQuery, GL_QUERY_RESULT_AVAILABLE, &queryDone);
@@ -134,10 +178,11 @@ int doPhysics(int turnsNeeded, double maxTime) {
     for (; turn < turnsNeeded; turn++) {
         glViewport(0, 0, g_simBuffers[0].width, g_simBuffers[0].height);
         glUseProgram(g_qturn.prog.id);
+        glUniform1i(g_qturn.u_potential, 2);
+        glUniform1i(g_qturn.u_dragPot, 3);
+        glUniform1i(g_qturn.u_wall, 4);
 
         for (int i = 0; i < 4; i++) {
-            glUniform1i(g_qturn.u_potential, 2);
-            glUniform1i(g_qturn.u_dragPot, 3);
             glUniform1i(g_qturn.u_prev, 0 + curBuf);
             curBuf = 1 - curBuf;
             glBindFramebuffer(GL_FRAMEBUFFER, g_simBuffers[curBuf].fbo);
@@ -241,16 +286,17 @@ int doPhysics(int turnsNeeded, double maxTime) {
     glUniform1i(g_pdf.u_prev, 0 + 1 - curBuf);
     glBindFramebuffer(GL_FRAMEBUFFER, g_pdfPyramid.layers[0].buf.fbo);
     drawQuad();
+    pyramidReduce(&g_rsumReduce, &g_pdfPyramid, 2);
 
-    glUseProgram(g_rsumReduce.prog.id);
-    glUniform1i(g_rsumReduce.u_src, 2);
+    glViewport(0, 0, g_simBuffers[0].width, g_simBuffers[0].height);
+    glUseProgram(g_cmul.prog.id);
     glActiveTexture(GL_TEXTURE2);
-    for (int i = 1; i < g_pdfPyramid.numLayers; i++) {
-        glBindFramebuffer(GL_FRAMEBUFFER, g_pdfPyramid.layers[i].buf.fbo);
-        glViewport(0, 0, g_pdfPyramid.layers[i].dataWidth, g_pdfPyramid.layers[i].dataHeight);
-        glBindTexture(GL_TEXTURE_2D, g_pdfPyramid.layers[i - 1].buf.texture);
-        drawQuad();
-    }
+    glBindTexture(GL_TEXTURE_2D, g_goalState.texture);
+    glUniform1i(g_cmul.u_left, 2);
+    glUniform1i(g_cmul.u_right, 0 + curBuf);
+    glBindFramebuffer(GL_FRAMEBUFFER, g_goalPyramid.layers[0].buf.fbo);
+    drawQuad();
+    pyramidReduce(&g_rgsumReduce, &g_goalPyramid, 2);
 
     return turnsNeeded - turn;
 }
@@ -275,14 +321,17 @@ void applyPutt() {
     glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, g_potentialBuffer.texture);
     glActiveTexture(GL_TEXTURE3);
-    glBindTexture(GL_TEXTURE_2D, g_puttBuffer.texture);
-    glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, g_dragPot.texture);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, g_wallBuffer.texture);
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_2D, g_puttBuffer.texture);
 
     // Do half a qturn to un-stagger the wavefunction
     glUseProgram(g_qturn.prog.id);
     glUniform1i(g_qturn.u_potential, 2);
-    glUniform1i(g_qturn.u_dragPot, 4);
+    glUniform1i(g_qturn.u_dragPot, 3);
+    glUniform1i(g_qturn.u_wall, 4);
     glUniform1f(g_qturn.u_dt, 0.5f * dt);
     glUniform1i(g_qturn.u_prev, 0 + curBuf);
     curBuf = 1 - curBuf;
@@ -290,7 +339,7 @@ void applyPutt() {
     drawQuad();
 
     glUseProgram(g_cmul.prog.id);
-    glUniform1i(g_cmul.u_left, 3);
+    glUniform1i(g_cmul.u_left, 5);
     glUniform1i(g_cmul.u_right, 0 + curBuf);
     curBuf = 1 - curBuf;
     glBindFramebuffer(GL_FRAMEBUFFER, g_simBuffers[curBuf].fbo);
@@ -298,8 +347,6 @@ void applyPutt() {
 
     // Do another half qturn to re-stagger the wavefunction
     glUseProgram(g_qturn.prog.id);
-    glUniform1i(g_qturn.u_potential, 2);
-    glUniform1i(g_qturn.u_dragPot, 4);
     glUniform1i(g_qturn.u_prev, 0 + curBuf);
     curBuf = 1 - curBuf;
     glBindFramebuffer(GL_FRAMEBUFFER, g_simBuffers[curBuf].fbo);
@@ -352,7 +399,6 @@ void uniformDisplayRelative(ProgSurface prog, float scale, SDL_Point drCenter) {
 }
 
 void renderDebug(GLuint texture, float a, float b, float c, float d) {
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, g_drWidth, g_drHeight);
 
     glClearColor(0.8f, 0.8f, 0.8f, 1.f);
@@ -376,8 +422,7 @@ void renderDebug(GLuint texture, float a, float b, float c, float d) {
     drawQuad();
 }
 
-void render() {
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+void renderGame(int showClub) {
     glViewport(0, 0, g_drWidth, g_drHeight);
 
     glClearColor(0.8f, 0.8f, 0.8f, 1.f);
@@ -411,10 +456,14 @@ void render() {
     glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_2D, g_colormapTexture);
 
+    glUniform1i(g_renderer.u_wall, 4);
+    glActiveTexture(GL_TEXTURE4);
+    glBindTexture(GL_TEXTURE_2D, g_wallBuffer.texture);
+
     glUniform1i(g_renderer.u_puttActive, puttActive);
     if (puttActive) {
-        glUniform1i(g_renderer.u_putt, 4);
-        glActiveTexture(GL_TEXTURE4);
+        glUniform1i(g_renderer.u_putt, 5);
+        glActiveTexture(GL_TEXTURE5);
         glBindTexture(GL_TEXTURE_2D, g_puttBuffer.texture);
     }
 
@@ -428,13 +477,15 @@ void render() {
 
     drawQuad();
 
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glUseProgram(g_clubGfx.prog.id);
-    uniformDisplayRelative(g_clubGfx.vert, 1.f, puttActive? puttStart : mouse);
-    glUniform1f(g_clubGfx.u_radius, clubPixSize()*displayScale);
-    drawQuad();
-    glDisable(GL_BLEND);
+    if (showClub) {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glUseProgram(g_clubGfx.prog.id);
+        uniformDisplayRelative(g_clubGfx.vert, 1.f, puttActive ? puttStart : mouse);
+        glUniform1f(g_clubGfx.u_radius, clubPixSize() * displayScale);
+        drawQuad();
+        glDisable(GL_BLEND);
+    }
 }
 
 
@@ -514,11 +565,7 @@ void renderFPS(double fps) {
         avgFPS, avgMTPS, pixels * avgMTPS / 1e6
     ) == -1) return;
 
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, g_drWidth, g_drHeight);
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     useFont(&g_fontRegular, (ProgDrawGlyph*)&g_msdfGlyph, 0);
     glUniform4f(g_msdfGlyph.u_color, 0.f, 0.f, 0.f, 1.f);
     Cursor c = {
@@ -527,23 +574,229 @@ void renderFPS(double fps) {
     };
 
     drawStringFixedNum(&c, text);
-    glDisable(GL_BLEND);
-
     SDL_free(text);
 }
 
+
+static float winProbability;
+static float totalProbability;
+void updateStats() {
+    float sumPDF;
+    glBindFramebuffer(GL_FRAMEBUFFER, g_pdfPyramid.layers[g_pdfPyramid.numLayers - 1].buf.fbo);
+    glReadPixels(0, 0, 1, 1, GL_RED, GL_FLOAT, &sumPDF);
+    totalProbability = sumPDF * dx * dx;
+
+    float goal[3];
+    glBindFramebuffer(GL_FRAMEBUFFER, g_goalPyramid.layers[g_goalPyramid.numLayers - 1].buf.fbo);
+    glReadPixels(0, 0, 1, 1, GL_RGB, GL_FLOAT, &goal);
+    winProbability = (goal[0]*goal[0] + goal[1]*goal[1]) * dx * dx / totalProbability;
+}
+
+
+void renderStats() {
+    glUseProgram(g_fillColor.prog.id);
+    int headerHeight = 40 * g_drHeight / g_scHeight;
+    glViewport(0, g_drHeight - headerHeight, g_drWidth, headerHeight);
+    glUniform4f(g_fillColor.u_color, 1.f, 1.f, 1.f, 0.25f);
+    drawQuad();
+    glViewport(0, 0, g_drWidth, g_drHeight);
+
+    useFont(&g_fontRegular, (ProgDrawGlyph*)&g_msdfGlyph, 0);
+    Cursor c = {
+        .left=5.f, .x=5.f, .y=(float)g_scHeight - 27.f, .size=22.f,
+        .viewWidth=(float)g_scWidth, .viewHeight=(float)g_scHeight
+    };
+
+    char *text;
+    if (SDL_asprintf(
+        &text, "P(win) = %.f%% / ",
+        floorf(100.f * winProbability)
+    ) == -1) return;
+    glUniform4f(g_msdfGlyph.u_color, 0.f, 0.f, 0.f, 1.f);
+    drawString(&c, text);
+    SDL_free(text);
+
+    if (SDL_asprintf(
+        &text, "%.f%%",
+        ceilf(100.f * winThreshold)
+    ) == -1) return;
+    glUniform4f(g_msdfGlyph.u_color, 0.2f, 1.f, 0.f, 1.f);
+    drawString(&c, text);
+    SDL_free(text);
+
+    if (SDL_asprintf(
+        &text, "Score: %d%s",
+        score%2 == 0? score / 2 : score,
+        score%2 == 0? "" : "/2"
+    ) == -1) return;
+
+    float scoreWidth = emWidth(&g_fontRegular, text);
+    c.x = c.left = (float)g_scWidth - scoreWidth * c.size - 5.f;
+    glUniform4f(g_msdfGlyph.u_color, 0.f, 0.f, 0.f, 1.f);
+    drawString(&c, text);
+    SDL_free(text);
+}
+
+void renderWinScreen() {
+    glUseProgram(g_fillColor.prog.id);
+    glViewport(0, 0, g_drWidth, g_drHeight);
+    glUniform4f(g_fillColor.u_color, 0.f, 0.2f, 0.1f, 0.75f);
+    drawQuad();
+
+    useFont(&g_fontRegular, (ProgDrawGlyph*)&g_msdfGlyph, 0);
+
+    Cursor c = {
+        .y=(float)g_scHeight * 0.75f, .size=75.f,
+        .viewWidth=(float)g_scWidth, .viewHeight=(float)g_scHeight
+    };
+
+    char *text = "You probably won!";
+    float width = emWidth(&g_fontRegular, text);
+    c.left = c.x = (float)g_scWidth * 0.5f - c.size * width * 0.5f;
+    glUniform4f(g_msdfGlyph.u_color, 1.f, 1.f, 1.f, 1.f);
+    drawString(&c, text);
+    c.size = 45.f;
+
+    if (SDL_asprintf(
+        &text, "\n\nHole in %d%s (par %d%s)",
+        score%2 == 0? score / 2 : score,
+        score%2 == 0? "" : "/2",
+        par%2 == 0? par / 2 : par,
+        par%2 == 0? "" : "/2"
+    ) == -1) return;
+    width = emWidth(&g_fontRegular, text);
+    c.left = c.x = (float)g_scWidth * 0.5f - c.size * width * 0.5f;
+    drawString(&c, text);
+    SDL_free(text);
+
+    c.size = 30.f;
+    text = "\nPress [R] to restart";
+    width = emWidth(&g_fontRegular, text);
+    c.left = c.x = (float)g_scWidth * 0.5f - c.size * width * 0.5f;
+    drawString(&c, text);
+}
+
+
+void renderHoleArrow(float seconds) {
+    static float progress = 0.f;
+    float opacity = 0.3f*cosf(2.f*M_PI*progress) + 0.7f;
+    progress += 0.75f * seconds;
+    progress -= floorf(progress);
+
+    glViewport(drDisplayArea.x, drDisplayArea.y, drDisplayArea.w, drDisplayArea.h);
+    Glyph *arrow = findGlyph(0x2193, g_fontRegular.numGlyphs, g_fontRegular.glyphs);
+    if (!arrow) return;
+    Glyph centeredArrow = *arrow;
+    centeredArrow.bbox.x = -centeredArrow.bbox.w / 2.f;
+
+    Cursor c = {
+        .size=80.f * (float)g_simBuffers[0].width/(float)drDisplayArea.w * (float)g_drWidth/(float)g_scWidth,
+        .viewWidth=(float)g_simBuffers[0].width,
+        .viewHeight=(float)g_simBuffers[0].height
+    };
+
+    c.left = c.x = holePos.x/dx;
+    c.y = holePos.y/dx;
+    glUniform4f(g_msdfGlyph.u_color, 0.2f, 1.f, 0.f, opacity);
+    drawGlyph(&c, &centeredArrow);
+}
+
+
+#define MAX_MEASUREMENTS 100
+static size_t activeMeasurements = 0;
+static SDL_Point measurements[MAX_MEASUREMENTS];
+void makeMeasurements() {
+    for (size_t i = 0; i < MAX_MEASUREMENTS; i++) {
+        measurements[i] = samplePyramid(&g_pdfPyramid);
+    }
+    activeMeasurements = MAX_MEASUREMENTS;
+}
+
+void showMeasurements() {
+    if (!activeMeasurements) return;
+    glViewport(drDisplayArea.x, drDisplayArea.y, drDisplayArea.w, drDisplayArea.h);
+    useFont(&g_fontRegular, (ProgDrawGlyph*)&g_msdfGlyph, 0);
+    glUniform4f(g_msdfGlyph.u_color, 0.f, 0.f, 0.f, 0.5f);
+
+    Cursor c = {
+        .size=15.f,
+        .viewWidth=(float)g_simBuffers[0].width,
+        .viewHeight=(float)g_simBuffers[0].height
+    };
+
+    Glyph *dot = findGlyph('.', g_fontRegular.numGlyphs, g_fontRegular.glyphs);
+    if (!dot) return;
+    Glyph centerDot = *dot;
+    centerDot.bbox.x = -dot->bbox.w/2.f;
+    centerDot.bbox.y = -dot->bbox.h/2.f;
+
+    for (size_t i = 0; i < activeMeasurements; i++) {
+        c.left = c.x = (float)measurements[i].x;
+        c.y = (float)measurements[i].y;
+        drawGlyph(&c, &centerDot);
+    }
+}
+
+
+// origin and size are in simulation grid units
+void setPutt(SDL_FPoint origin, float size, float px, float py, float phase) {
+    glViewport(0, 0, g_puttBuffer.width, g_puttBuffer.height);
+    glBindFramebuffer(GL_FRAMEBUFFER, g_puttBuffer.fbo);
+    glUseProgram(g_putt.prog.id);
+
+    glUniform2f(g_putt.vert.u_scale, dx * (float)g_puttBuffer.width, dx * (float)g_puttBuffer.height);
+    glUniform2f(g_putt.vert.u_shift, -dx * origin.x, -dx * origin.y);
+
+    glUniform1f(g_putt.u_clubRadius, dx * size);
+    glUniform2f(g_putt.u_momentum, px, py);
+    glUniform1f(g_putt.u_phase, phase);
+
+    drawQuad();
+}
+
+void setPlaneWavePutt(float px, float py) {
+    glViewport(0, 0, g_puttBuffer.width, g_puttBuffer.height);
+    glBindFramebuffer(GL_FRAMEBUFFER, g_puttBuffer.fbo);
+    glUseProgram(g_planeWave.prog.id);
+    glUniform2f(g_planeWave.vert.u_scale, dx * (float)g_puttBuffer.width, dx * (float)g_puttBuffer.height);
+    glUniform2f(g_planeWave.u_momentum, px, py);
+
+    drawQuad();
+}
+
+
+void resetGame() {
+    gameWon = 0;
+    puttActive = 0;
+    paused = 0;
+    debugView = 0;
+    score = 0;
+
+    float simWidth = dx * (float)g_simBuffers[0].width;
+    float simHeight = dx * (float)g_simBuffers[0].height;
+    initialSigma = 0.03f * simHeight;
+    initPhysics(0.2f * simWidth, 0.5f * simHeight, initialSigma);
+
+    float holeRadius = 0.2f*simHeight;
+    float holeDepth = 0.05f;
+    float holeSigma = sqrtf(holeRadius/M_PI)*powf(2.f/mass/holeDepth, 0.25f);
+    holePos = (SDL_FPoint) {.x = simWidth-0.45f*simHeight, .y = 0.5f*simHeight};
+    setGaussianWavepacket(&g_goalState, holePos.x, holePos.y, holeSigma, dx);
+    // initPhysics(holePos.x, holePos.y, holeSigma);
+
+    // setPlaneWavePutt(0.5f, 0.f);
+    // applyPutt();
+}
 
 int gameLoop() {
     Uint64 prev = SDL_GetPerformanceCounter();
     double slopTime = 0.;
     unsigned frame = 0;
-    puttActive = 0;
-
     // TODO: perfQuery never gets deleted, and probably should be
     //  created elsewhere (really should be part of physics system, but
     //  I need to separate that out)
     glGenQueries(1, &perfQuery);
-    initPhysics(0.5f * dx * (float)g_simBuffers[0].width, 0.5f * dx * (float)g_simBuffers[0].height);
+    resetGame();
 
     while (1) {
         SDL_GL_SwapWindow(g_window);
@@ -560,32 +813,19 @@ int gameLoop() {
                 1. / MIN_FPS
             );
             slopTime = fmod(slopTime, 1. / PHYS_TURNS_PER_SECOND);
+            updateStats();
         } else if (puttActive) {
             int mouseX, mouseY;
             SDL_GetMouseState(&mouseX, &mouseY);
-            glViewport(0, 0, g_puttBuffer.width, g_puttBuffer.height);
-
-            glBindFramebuffer(GL_FRAMEBUFFER, g_puttBuffer.fbo);
-            glUseProgram(g_putt.prog.id);
-
-            glUniform2f(g_putt.vert.u_scale, dx * (float)g_puttBuffer.width, dx * (float)g_puttBuffer.height);
-            SDL_FPoint puttPix = simPixelPos(puttStart);
-
-            glUniform2f(g_putt.vert.u_shift, -dx * puttPix.x, -dx * puttPix.y);
-            glUniform1f(g_putt.u_clubRadius, dx * clubPixSize());
-
             // TODO: actually choose momentum sensibly
             //  Also, possibly we may want the putt wave we show to be
             //  different than the putt wave we use.
-            float px = 5e-4f*(float)(mouseX - puttStart.x);
-            float py = 5e-4f*(float)(puttStart.y - mouseY);
-            glUniform2f(g_putt.u_momentum, px, py);
+            float px = 8e-4f*(float)(mouseX - puttStart.x);
+            float py = 8e-4f*(float)(puttStart.y - mouseY);
             puttPhase += hypotf(px, py) * 0.5f * PHYS_TURNS_PER_SECOND * dt * (float)slopTime / mass;
             slopTime = 0.;  // slopTime is fully consumed by the putt animation
             puttPhase = fmodf(puttPhase, 2.*M_PI);
-            glUniform1f(g_putt.u_phase, puttPhase);
-
-            drawQuad();
+            setPutt(simPixelPos(puttStart), clubPixSize(), px, py, puttPhase);
         } else {
             // If slopTime isn't used, it still needs to be reset to 0
             // (fully consumed by the frame).
@@ -596,23 +836,46 @@ int gameLoop() {
         }
 
         // if (frame == 0) paused = 1;
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
         if (debugView) {
             if (debugViewIdx % 3 == 0) renderDebug(g_dragPot.texture, 5e-2f, 0.f, 0.f, 0.f);
             else if (debugViewIdx % 3 == 1) renderDebug(g_dragLIP.layers[0].texture, 1e-3f, 0.f, 0.f, 0.f);
             else renderDebug(g_simBuffers[curBuf].texture, 1e-3f, 0.f, 0.f, 0.f);
-        } else render();
+        } else renderGame(!gameWon);
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        showMeasurements();
+        if (winProbability >= winThreshold) {
+            paused = paused || !gameWon;
+            gameWon = 1;
+            puttActive = 0;  // currently unnecessary
+        }
+        renderStats();
+
+        if (!gameWon) {
+            renderHoleArrow(frameDuration);
+        }
+
+        if (gameWon) {
+            renderWinScreen();
+        }
 
         renderFPS(1./frameDuration);
+        glDisable(GL_BLEND);
 
         SDL_Event e;
         while (SDL_PollEvent(&e)) switch (e.type) {
             case SDL_QUIT:
                 return 0;
             case SDL_MOUSEWHEEL:
+                if (gameWon) break;
                 clubSize += 0.1f*e.wheel.preciseY;
                 clubSize = SDL_clamp(clubSize, 0.f, 1.f);
                 break;
             case SDL_MOUSEBUTTONDOWN:
+                if (gameWon) break;
                 // TODO: maybe use SDL_SetRelativeMouseMode(SDL_TRUE) in putt mode
                 puttActive = 1;
                 puttPhase = 0.f;
@@ -621,8 +884,11 @@ int gameLoop() {
                 SDL_GetMouseState(&puttStart.x, &puttStart.y);
                 break;
             case SDL_MOUSEBUTTONUP:
-                puttActive = 0;
-                applyPutt();
+                if (puttActive) {
+                    puttActive = 0;
+                    applyPutt();
+                    score += 2; // 2/2
+                }
                 break;
             case SDL_KEYDOWN:
                 if (e.key.keysym.sym == SDLK_f) {
@@ -631,19 +897,26 @@ int gameLoop() {
                         1./frameDuration, skippedTurns, perfQueryTurns / frameDuration, maxTurnsPerSecond
                     );
 
-                    float totalProb;
-                    glBindFramebuffer(GL_FRAMEBUFFER, g_pdfPyramid.layers[g_pdfPyramid.numLayers - 1].buf.fbo);
-                    glReadPixels(0, 0, 1, 1, GL_RED, GL_FLOAT, &totalProb);
-                    SDL_Log("totalProb: %f", totalProb);
+                    SDL_Log("P(win): %f, P(total): %f", winProbability, totalProbability);
                 } else if (e.key.keysym.sym == SDLK_p) {
                     paused = !paused;
+                    activeMeasurements = 0;
                 } else if (e.key.keysym.sym == SDLK_d) {
                     debugView = !debugView;
                 } else if (e.key.keysym.sym == SDLK_a) {
                     debugViewIdx++;
                 } else if (e.key.keysym.sym == SDLK_SPACE) {
+                    if (gameWon) break;
                     SDL_Point measurement = samplePyramid(&g_pdfPyramid);
-                    initPhysics(dx*(float)measurement.x, dx*(float)measurement.y);
+                    initPhysics(dx*(float)measurement.x, dx*(float)measurement.y, initialSigma);
+                    score += 1; // 1/2
+                } else if (e.key.keysym.sym == SDLK_m) {
+                    makeMeasurements();
+                    paused = 1;
+                } else if (e.key.keysym.sym == SDLK_r) {
+                    resetGame();
+                } else if (e.key.keysym.sym == SDLK_ESCAPE) {
+                    puttActive = 0;
                 }
                 break;
         }

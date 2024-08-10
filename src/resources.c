@@ -12,8 +12,10 @@ ProgRenderer g_renderer = {.prog = {.name = "shaders/graphics/renderer.frag"}};
 ProgDebugRenderer g_debugRenderer = {.prog = {.name = "shaders/graphics/debug.frag"}};
 ProgClubGraphics g_clubGfx = {.prog = {.name = "shaders/graphics/club.frag"}};
 ProgPutt g_putt = {.prog = {.name = "shaders/putt.frag"}};
+ProgPlaneWave g_planeWave = {.prog = {.name = "shaders/plane_wave.frag"}};
 ProgCMul g_cmul = {.prog = {.name = "shaders/cmul.frag"}};
-ProgRSumReduce g_rsumReduce = {.prog = {.name = "shaders/rsum_reduce.frag"}};
+ProgReduce g_rsumReduce = {.prog = {.name = "shaders/rsum_reduce.frag"}};
+ProgReduce g_rgsumReduce = {.prog = {.name = "shaders/rgsum_reduce.frag"}};
 ProgInitLIP g_initLIP = {.prog = {.name = "shaders/drag/init_lip.comp"}};
 ProgBuildLIP g_buildLIP = {.prog = {.name = "shaders/drag/build_lip.comp"}};
 ProgLIPKiss g_LIPKiss = {.prog = {.name = "shaders/drag/lip_kiss.comp"}};
@@ -22,14 +24,20 @@ ProgIntegrateLIP g_integrateLIP[2] = {
     {.prog = {.name = "shaders/drag/integrate_lip_y.comp"}}
 };
 ProgDrawMSDFGlyph g_msdfGlyph = {.prog = {.name = "shaders/text/msdf.frag"}};
+ProgCourse g_courseWall = {.prog = {.name = "shaders/system/wall.frag"}};
+ProgCourse g_coursePotential = {.prog = {.name = "shaders/system/potential.frag"}};
+ProgFillColor g_fillColor = {.prog = {.name = "shaders/graphics/fill_color.frag"}};
 
 TexturedFrameBuffer g_potentialBuffer;
+TexturedFrameBuffer g_wallBuffer;
 TexturedFrameBuffer g_simBuffers[2];
 TexturedFrameBuffer g_puttBuffer;
 TexturedFrameBuffer g_pdfBuffer;
 PaddedPyramidBuffer g_pdfPyramid;
-PyramidBuffer g_dragLIP;
+TexturedFrameBuffer g_goalState;
+PaddedPyramidBuffer g_goalPyramid;
 TexturedFrameBuffer g_dragPot;
+PyramidBuffer g_dragLIP;
 
 Font g_fontRegular;
 
@@ -86,6 +94,7 @@ int loadResources() {
     EXPECT_UNIFORM(&g_qturn, u_prev);
     EXPECT_UNIFORM(&g_qturn, u_potential);
     EXPECT_UNIFORM(&g_qturn, u_dragPot);
+    EXPECT_UNIFORM(&g_qturn, u_wall);
 
     g_pdf.prog.id = compileAndLinkFragProgram(
         &identityShader, g_basePath, g_pdf.prog.name, "o_psi2"
@@ -98,7 +107,6 @@ int loadResources() {
         &surfaceShader, g_basePath, g_renderer.prog.name, "o_color"
     );
     if (g_renderer.prog.id == 0) return 1;
-    // TODO: move common vertex uniform initialization elsewhere
     EXPECT_UNIFORM(&g_renderer.vert, u_scale);
     EXPECT_UNIFORM(&g_renderer.vert, u_shift);
     EXPECT_UNIFORM(&g_renderer, u_pdf);
@@ -109,12 +117,12 @@ int loadResources() {
     FIND_UNIFORM(&g_renderer, u_colormap);
     FIND_UNIFORM(&g_renderer, u_skybox);
     FIND_UNIFORM(&g_renderer, u_light);
+    FIND_UNIFORM(&g_renderer, u_wall);
 
     g_debugRenderer.prog.id = compileAndLinkFragProgram(
         &surfaceShader, g_basePath, g_debugRenderer.prog.name, "o_color"
     );
     if (g_debugRenderer.prog.id == 0) return 1;
-    // TODO: move common vertex uniform initialization elsewhere
     EXPECT_UNIFORM(&g_debugRenderer.vert, u_scale);
     EXPECT_UNIFORM(&g_debugRenderer.vert, u_shift);
     EXPECT_UNIFORM(&g_debugRenderer, u_data);
@@ -125,7 +133,6 @@ int loadResources() {
         &surfaceShader, g_basePath, g_clubGfx.prog.name, "o_color"
     );
     if (g_clubGfx.prog.id == 0) return 1;
-    // TODO: move common vertex uniform initialization elsewhere
     EXPECT_UNIFORM(&g_clubGfx.vert, u_scale);
     EXPECT_UNIFORM(&g_clubGfx.vert, u_shift);
     EXPECT_UNIFORM(&g_clubGfx, u_radius);
@@ -134,12 +141,19 @@ int loadResources() {
         &surfaceShader, g_basePath, g_putt.prog.name, "o_psi"
     );
     if (g_putt.prog.id == 0) return 1;
-    // TODO: move common vertex uniform initialization elsewhere
     EXPECT_UNIFORM(&g_putt.vert, u_scale);
     EXPECT_UNIFORM(&g_putt.vert, u_shift);
     EXPECT_UNIFORM(&g_putt, u_clubRadius);
     EXPECT_UNIFORM(&g_putt, u_momentum);
     EXPECT_UNIFORM(&g_putt, u_phase);
+
+    g_planeWave.prog.id = compileAndLinkFragProgram(
+        &surfaceShader, g_basePath, g_planeWave.prog.name, "o_psi"
+    );
+    if (g_planeWave.prog.id == 0) return 1;
+    EXPECT_UNIFORM(&g_planeWave.vert, u_scale);
+    EXPECT_UNIFORM(&g_planeWave.vert, u_shift);
+    EXPECT_UNIFORM(&g_planeWave, u_momentum);
 
     g_cmul.prog.id = compileAndLinkFragProgram(
         &identityShader, g_basePath, g_cmul.prog.name, "o_result"
@@ -153,6 +167,12 @@ int loadResources() {
     );
     if (g_rsumReduce.prog.id == 0) return 1;
     EXPECT_UNIFORM(&g_rsumReduce, u_src);
+
+    g_rgsumReduce.prog.id = compileAndLinkFragProgram(
+        &identityShader, g_basePath, g_rgsumReduce.prog.name, "o_sum"
+    );
+    if (g_rgsumReduce.prog.id == 0) return 1;
+    EXPECT_UNIFORM(&g_rgsumReduce, u_src);
 
     g_initLIP.prog.id = compileAndLinkCompProgram(g_basePath, g_initLIP.prog.name);
     if (g_initLIP.prog.id == 0) return 1;
@@ -189,6 +209,22 @@ int loadResources() {
     FIND_UNIFORM(&g_msdfGlyph.base, u_pxrange);
     EXPECT_UNIFORM(&g_msdfGlyph, u_color);
 
+    g_courseWall.prog.id = compileAndLinkFragProgram(&surfaceShader, g_basePath, g_courseWall.prog.name, "o_wall");
+    if (g_courseWall.prog.id == 0) return 1;
+    EXPECT_UNIFORM(&g_courseWall.vert, u_scale);
+    EXPECT_UNIFORM(&g_courseWall.vert, u_shift);
+    FIND_UNIFORM(&g_courseWall, u_simSize);
+
+    g_coursePotential.prog.id = compileAndLinkFragProgram(&surfaceShader, g_basePath, g_coursePotential.prog.name, "o_potential");
+    if (g_coursePotential.prog.id == 0) return 1;
+    EXPECT_UNIFORM(&g_coursePotential.vert, u_scale);
+    EXPECT_UNIFORM(&g_coursePotential.vert, u_shift);
+    FIND_UNIFORM(&g_coursePotential, u_simSize);
+
+    g_fillColor.prog.id = compileAndLinkFragProgram(&identityShader, g_basePath, g_fillColor.prog.name, "o_color");
+    if (g_fillColor.prog.id == 0) return 1;
+    EXPECT_UNIFORM(&g_fillColor, u_color);
+
     double aspect = 1.5;
     int simHeight = 257;
     int simWidth = (int)(simHeight*aspect);
@@ -201,10 +237,26 @@ int loadResources() {
 
     err = initTexturedFrameBuffer(&g_potentialBuffer, simWidth, simHeight, GL_R32F, 1);
     if (err != 0) return err;
-    // zero potential
     glBindFramebuffer(GL_FRAMEBUFFER, g_potentialBuffer.fbo);
-    glClearColor(0.f, 0.f, 0.0f, 1.f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glViewport(0, 0, simWidth, simHeight);
+    glUseProgram(g_coursePotential.prog.id);
+    glUniform2f(g_coursePotential.vert.u_shift, 0.f, 0.f);
+    glUniform2f(g_coursePotential.vert.u_scale, 1.f, 1.f);
+    glUniform2f(g_coursePotential.u_simSize, (float)simWidth, (float)simHeight);
+    drawQuad();
+    glViewport(0, 0, g_drWidth, g_drHeight);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    err = initTexturedFrameBuffer(&g_wallBuffer, simWidth, simHeight, GL_RED, 1);
+    if (err != 0) return err;
+    glBindFramebuffer(GL_FRAMEBUFFER, g_wallBuffer.fbo);
+    glViewport(0, 0, simWidth, simHeight);
+    glUseProgram(g_courseWall.prog.id);
+    glUniform2f(g_courseWall.vert.u_shift, 0.f, 0.f);
+    glUniform2f(g_courseWall.vert.u_scale, 1.f, 1.f);
+    glUniform2f(g_courseWall.u_simSize, (float)simWidth, (float)simHeight);
+    drawQuad();
+    glViewport(0, 0, g_drWidth, g_drHeight);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     err = initTexturedFrameBuffer(&g_puttBuffer, simWidth, simHeight, GL_RG32F, 1);
@@ -222,6 +274,11 @@ int loadResources() {
     err = initTexturedFrameBuffer(&g_dragPot, simWidth, simHeight, GL_R32F, 1);
     if (err != 0) return err;
 
+    err = initTexturedFrameBuffer(&g_goalState, simWidth, simHeight, GL_RG32F, 1);
+    if (err != 0) return err;
+
+    err = initCeilPyramidBuffer(&g_goalPyramid, simWidth, simHeight, GL_RG32F, 1);
+    if (err != 0) return err;
 
     if (g_renderer.u_skybox != -1) {
         char *filename;
@@ -285,18 +342,38 @@ void freeResources() {
     glDeleteTextures(1, &g_skyboxTexture);
     g_skyboxTexture = 0;
 
+    deleteTexturedFrameBuffer(&g_goalState);
+    deletePaddedPyramidBuffer(&g_goalPyramid);
     deleteTexturedFrameBuffer(&g_dragPot);
     deletePyramidBuffer(&g_dragLIP);
     deletePaddedPyramidBuffer(&g_pdfPyramid);
     deleteTexturedFrameBuffer(&g_pdfBuffer);
     deleteTexturedFrameBuffer(&g_puttBuffer);
+    deleteTexturedFrameBuffer(&g_wallBuffer);
     deleteTexturedFrameBuffer(&g_potentialBuffer);
     for (int i = 0; i < 2; i++) deleteTexturedFrameBuffer(&g_simBuffers[i]);
 
+    glDeleteProgram(g_coursePotential.prog.id);
+    glDeleteProgram(g_courseWall.prog.id);
+
+    for (int i = 0; i < 2; i++) glDeleteProgram(g_integrateLIP[i].prog.id);
+    glDeleteProgram(g_LIPKiss.prog.id);
+    glDeleteProgram(g_buildLIP.prog.id);
+    glDeleteProgram(g_initLIP.prog.id);
+    glDeleteProgram(g_rgsumReduce.prog.id);
+    glDeleteProgram(g_rsumReduce.prog.id);
+    glDeleteProgram(g_planeWave.prog.id);
+    glDeleteProgram(g_clubGfx.prog.id);
+    glDeleteProgram(g_debugRenderer.prog.id);
+    glDeleteProgram(g_renderer.prog.id);
+    glDeleteProgram(g_msdfGlyph.prog.id);
+    glDeleteProgram(g_fillColor.prog.id);
+    glDeleteProgram(g_pdf.prog.id);
     glDeleteProgram(g_cmul.prog.id);
     glDeleteProgram(g_putt.prog.id);
     glDeleteProgram(g_qturn.prog.id);
     glDeleteProgram(g_gaussian.prog.id);
     glDeleteShader(identityShader.id);
     glDeleteShader(surfaceShader.id);
+    glDeleteShader(glyphVertShader.id);
 }

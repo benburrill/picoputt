@@ -14,6 +14,7 @@ uniform float u_4m_dx2;           // 4*m*dx^2, where dx is texel size and m is m
 uniform float u_dt;               // Timestep
 uniform sampler2D u_prev;         // Previous wavefunction state
 uniform sampler2D u_potential;    // Potential function at current time
+uniform sampler2D u_wall;
 uniform sampler2D u_dragPot;
 
 
@@ -32,6 +33,11 @@ uniform sampler2D u_dragPot;
 
 void main() {
     ivec2 pos = ivec2(gl_FragCoord.xy);
+    if (texelFetch(u_wall, pos, 0).r > 0.5) {
+        o_psi = vec2(0., 0.);
+        return;
+    }
+
     ivec2 edge = textureSize(u_prev, 0) - 1;
     ivec2 flip = ivec2(pos.x, edge.y - pos.y);
     vec2 prevPsi = texelFetch(u_prev, pos, 0).rg;  // redal and gremaginary components

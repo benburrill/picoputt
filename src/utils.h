@@ -10,9 +10,9 @@ void logGlErrors();
 
 // TODO: restructure things better, this is nasty
 #define ATTR_IDX_NDC 0
-#define VAR_BIND_NDC ((VariableBinding) {"a_ndc", ATTR_IDX_NDC})
+#define VAR_BIND_NDC {"a_ndc", ATTR_IDX_NDC}
 #define ATTR_IDX_UV 1
-#define VAR_BIND_UV ((VariableBinding) {"a_uv", ATTR_IDX_UV})
+#define VAR_BIND_UV {"a_uv", ATTR_IDX_UV}
 void drawQuad();
 void initQuad();
 void destroyQuad();

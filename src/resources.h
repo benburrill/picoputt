@@ -28,6 +28,7 @@ typedef struct {
     GLint u_prev;
     GLint u_potential;
     GLint u_dragPot;
+    GLint u_wall;
 } ProgQTurn;
 extern ProgQTurn g_qturn;
 
@@ -56,6 +57,7 @@ typedef struct {
     GLint u_colormap;
     GLint u_skybox;
     GLint u_light;
+    GLint u_wall;
 } ProgRenderer;
 extern ProgRenderer g_renderer;
 
@@ -100,6 +102,16 @@ typedef struct {
         ProgSurface vert;
     };
 
+    GLint u_momentum;
+} ProgPlaneWave;
+extern ProgPlaneWave g_planeWave;
+
+typedef struct {
+    union {
+        Program prog;
+        ProgSurface vert;
+    };
+
     GLint u_radius;
 } ProgClubGraphics;
 extern ProgClubGraphics g_clubGfx;
@@ -122,8 +134,9 @@ typedef struct {
     };
 
     GLint u_src;
-} ProgRSumReduce;
-extern ProgRSumReduce g_rsumReduce;
+} ProgReduce;
+extern ProgReduce g_rsumReduce;
+extern ProgReduce g_rgsumReduce;
 
 typedef struct {
     Program prog;
@@ -166,15 +179,38 @@ typedef struct {
 } ProgDrawMSDFGlyph;
 extern ProgDrawMSDFGlyph g_msdfGlyph;
 
+typedef struct {
+    union {
+        Program prog;
+        ProgSurface vert;
+    };
+
+    GLint u_simSize;
+} ProgCourse;
+extern ProgCourse g_courseWall;
+extern ProgCourse g_coursePotential;
+
+typedef struct {
+    union {
+        Program prog;
+        ProgIdentity vert;
+    };
+    GLint u_color;
+} ProgFillColor;
+extern ProgFillColor g_fillColor;
+
 // TODO: for time-dep pots we probably want 2 buffers so we precompute
 //  the next potential while we're using the current one
 extern TexturedFrameBuffer g_potentialBuffer;
+extern TexturedFrameBuffer g_wallBuffer;
 extern TexturedFrameBuffer g_simBuffers[2];
 extern TexturedFrameBuffer g_puttBuffer;
 extern TexturedFrameBuffer g_pdfBuffer;
 extern PaddedPyramidBuffer g_pdfPyramid;
-extern PyramidBuffer g_dragLIP;
+extern TexturedFrameBuffer g_goalState;
+extern PaddedPyramidBuffer g_goalPyramid;
 extern TexturedFrameBuffer g_dragPot;
+extern PyramidBuffer g_dragLIP;
 extern GLuint g_skyboxTexture;
 extern GLuint g_colormapTexture;
 

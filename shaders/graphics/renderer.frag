@@ -9,6 +9,7 @@ out vec4 o_color;
 
 uniform sampler2D u_pdf;
 uniform sampler2D u_totalProb;  // 1x1 texture, sum of u_pdf
+uniform sampler2D u_wall;
 uniform vec2 u_simSize;  // can't use textureSize(u_pdf, 0) because it may be padded.
 uniform bool u_puttActive;
 uniform sampler2D u_putt;
@@ -18,6 +19,10 @@ uniform vec3 u_light;
 in vec2 v_pos;  // texture uv coordinates provided by surface.vert
 
 void main() {
+    if (textureLod(u_wall, v_pos, 0).r > 0.5) {
+        discard;
+    }
+
     float totalProb = texelFetch(u_totalProb, ivec2(0, 0), 0).r;
 
     // Height map from |psi|^2, rescaled to have a fixed average height
