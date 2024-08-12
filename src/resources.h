@@ -49,6 +49,7 @@ typedef struct {
         ProgSurface vert;
     };
 
+    GLint u_cur;
     GLint u_pdf;
     GLint u_totalProb;
     GLint u_simSize;
@@ -57,7 +58,11 @@ typedef struct {
     GLint u_colormap;
     GLint u_skybox;
     GLint u_light;
+    GLint u_potential;
     GLint u_wall;
+    GLint u_drContourThickness;
+    GLint u_contourProgress;
+    GLint u_contourSep;
 } ProgRenderer;
 extern ProgRenderer g_renderer;
 
@@ -182,7 +187,7 @@ extern ProgDrawMSDFGlyph g_msdfGlyph;
 typedef struct {
     union {
         Program prog;
-        ProgSurface vert;
+        ProgIdentity vert;
     };
 
     GLint u_simSize;

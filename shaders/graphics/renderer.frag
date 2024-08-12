@@ -7,8 +7,10 @@
 
 out vec4 o_color;
 
+uniform sampler2D u_cur;
 uniform sampler2D u_pdf;
 uniform sampler2D u_totalProb;  // 1x1 texture, sum of u_pdf
+uniform sampler2D u_potential;
 uniform sampler2D u_wall;
 uniform vec2 u_simSize;  // can't use textureSize(u_pdf, 0) because it may be padded.
 uniform bool u_puttActive;
@@ -16,6 +18,9 @@ uniform sampler2D u_putt;
 uniform sampler2D u_colormap;
 uniform samplerCube u_skybox;
 uniform vec3 u_light;
+uniform float u_drContourThickness;// = 0.5;
+uniform float u_contourProgress;// = 0.;
+uniform float u_contourSep;// = 0.01;
 in vec2 v_pos;  // texture uv coordinates provided by surface.vert
 
 void main() {
@@ -66,6 +71,17 @@ void main() {
         0.2 * spec * specCol,
         1.
     );
+
+    float V = textureLod(u_potential, v_pos, 0).r;
+    vec3 Vcolor = o_color.rgb;
+
+    float dV = length(vec2(dFdx(V), dFdy(V)));
+    if (dV != 0.) {
+        float contourDist = u_contourSep*abs(fract(V/u_contourSep + u_contourProgress) - 0.5) / dV;
+        Vcolor = mix(vec3(0.3, 0.1, 0.1), Vcolor, clamp(contourDist - u_drContourThickness, 0, 1.));
+    }
+
+    o_color = vec4(mix(Vcolor, o_color.rgb, clamp(height + 0.3, 0., 0.9)), 1.);
 
 
     if (u_puttActive) {

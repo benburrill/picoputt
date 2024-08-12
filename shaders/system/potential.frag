@@ -1,7 +1,6 @@
 #version 430
 
 out float o_potential;
-in vec2 v_pos;
 uniform vec2 u_simSize;
 
 #define PI 3.141592653589793

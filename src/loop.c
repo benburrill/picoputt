@@ -7,7 +7,7 @@
 #include "utils.h"
 #include "resources.h"
 
-#define PHYS_TURNS_PER_SECOND 400
+#define PHYS_TURNS_PER_SECOND 300
 
 // This is misleadingly named, FPS can go lower than this.
 // But the number of physics turns per frame is throttled so that the
@@ -16,7 +16,7 @@
 #define MIN_FPS 20
 
 // Simulation parameters
-float dt = 0.1f;
+float dt = 0.2f;
 float dx = 1.f;
 float mass = 1.f;
 
@@ -422,7 +422,11 @@ void renderDebug(GLuint texture, float a, float b, float c, float d) {
     drawQuad();
 }
 
-void renderGame(int showClub) {
+void renderGame(float seconds, int showClub) {
+    static float contourProgress = 0.f;
+    contourProgress += 0.5f * seconds;
+    contourProgress -= floorf(contourProgress);
+
     glViewport(0, 0, g_drWidth, g_drHeight);
 
     glClearColor(0.8f, 0.8f, 0.8f, 1.f);
@@ -439,31 +443,42 @@ void renderGame(int showClub) {
     glUniform2f(g_renderer.vert.u_shift, 0.f, 0.f);
 
     glUniform2f(g_renderer.u_simSize, (float)g_simBuffers[0].width, (float)g_simBuffers[0].height);
+    glUniform1f(g_renderer.u_drContourThickness, 0.5f*(float)g_drWidth/(float)g_scWidth);
+    glUniform1f(g_renderer.u_contourProgress, contourProgress);
+    glUniform1f(g_renderer.u_contourSep, 0.01f);
 
-    glUniform1i(g_renderer.u_pdf, 0);
+    glUniform1i(g_renderer.u_cur, 0);
     glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, g_simBuffers[curBuf].texture);
+
+    glUniform1i(g_renderer.u_pdf, 1);
+    glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, g_pdfPyramid.layers[0].buf.texture);
 
-    glUniform1i(g_renderer.u_totalProb, 1);
-    glActiveTexture(GL_TEXTURE1);
+    glUniform1i(g_renderer.u_totalProb, 2);
+    glActiveTexture(GL_TEXTURE2);
     glBindTexture(GL_TEXTURE_2D, g_pdfPyramid.layers[g_pdfPyramid.numLayers - 1].buf.texture);
 
-    glUniform1i(g_renderer.u_skybox, 2);
-    glActiveTexture(GL_TEXTURE2);
+    glUniform1i(g_renderer.u_skybox, 3);
+    glActiveTexture(GL_TEXTURE3);
     glBindTexture(GL_TEXTURE_CUBE_MAP, g_skyboxTexture);
 
-    glUniform1i(g_renderer.u_colormap, 3);
-    glActiveTexture(GL_TEXTURE3);
+    glUniform1i(g_renderer.u_colormap, 4);
+    glActiveTexture(GL_TEXTURE4);
     glBindTexture(GL_TEXTURE_2D, g_colormapTexture);
 
-    glUniform1i(g_renderer.u_wall, 4);
-    glActiveTexture(GL_TEXTURE4);
+    glUniform1i(g_renderer.u_potential, 5);
+    glActiveTexture(GL_TEXTURE5);
+    glBindTexture(GL_TEXTURE_2D, g_potentialBuffer.texture);
+
+    glUniform1i(g_renderer.u_wall, 6);
+    glActiveTexture(GL_TEXTURE6);
     glBindTexture(GL_TEXTURE_2D, g_wallBuffer.texture);
 
     glUniform1i(g_renderer.u_puttActive, puttActive);
     if (puttActive) {
-        glUniform1i(g_renderer.u_putt, 5);
-        glActiveTexture(GL_TEXTURE5);
+        glUniform1i(g_renderer.u_putt, 7);
+        glActiveTexture(GL_TEXTURE7);
         glBindTexture(GL_TEXTURE_2D, g_puttBuffer.texture);
     }
 
@@ -607,12 +622,48 @@ void renderStats() {
         .viewWidth=(float)g_scWidth, .viewHeight=(float)g_scHeight
     };
 
+    GLfloat mainColor[4] = {0.f, 0.f, 0.f, 1.f};
+    GLfloat winColor[4] = {0.2f, 1.f, 0.f, 1.f};
+
+    glUniform4fv(g_msdfGlyph.u_color, 1, mainColor);
+    drawString(&c, "P(");
+    glUniform4fv(g_msdfGlyph.u_color, 1, winColor);
+    drawString(&c, "win");
+    glUniform4fv(g_msdfGlyph.u_color, 1, mainColor);
+    drawString(&c, ") = ");
+    c.size = 25.f;
+    drawChar(&c, '|');
+    c.size = 22.f;
+    drawChar(&c, 0x27e8);
+    c.size = 20.f;
+    drawString(&c, "ball");
+    c.size = 22.f;
+    drawChar(&c, '|');
+    c.size = 20.f;
+    glUniform4fv(g_msdfGlyph.u_color, 1, winColor);
+    drawString(&c, "hole");
+    glUniform4fv(g_msdfGlyph.u_color, 1, mainColor);
+    c.size = 22.f;
+    drawChar(&c, 0x27e9);
+    c.size = 25.f;
+    drawChar(&c, '|');
+    c.size = 22.f;
+    {
+        float prevY = c.y;
+        float prevSize = c.size;
+        c.y += c.size * 0.5f;
+        c.size *= 0.66f;
+        drawChar(&c, '2');
+        c.y = prevY;
+        c.size = prevSize;
+    }
+
     char *text;
     if (SDL_asprintf(
-        &text, "P(win) = %.f%% / ",
+        &text, " = %.f%% / ",
         floorf(100.f * winProbability)
     ) == -1) return;
-    glUniform4f(g_msdfGlyph.u_color, 0.f, 0.f, 0.f, 1.f);
+    glUniform4fv(g_msdfGlyph.u_color, 1, mainColor);
     drawString(&c, text);
     SDL_free(text);
 
@@ -620,7 +671,7 @@ void renderStats() {
         &text, "%.f%%",
         ceilf(100.f * winThreshold)
     ) == -1) return;
-    glUniform4f(g_msdfGlyph.u_color, 0.2f, 1.f, 0.f, 1.f);
+    glUniform4fv(g_msdfGlyph.u_color, 1, winColor);
     drawString(&c, text);
     SDL_free(text);
 
@@ -632,7 +683,7 @@ void renderStats() {
 
     float scoreWidth = emWidth(&g_fontRegular, text);
     c.x = c.left = (float)g_scWidth - scoreWidth * c.size - 5.f;
-    glUniform4f(g_msdfGlyph.u_color, 0.f, 0.f, 0.f, 1.f);
+    glUniform4fv(g_msdfGlyph.u_color, 1, mainColor);
     drawString(&c, text);
     SDL_free(text);
 }
@@ -695,7 +746,7 @@ void renderHoleArrow(float seconds) {
         .viewHeight=(float)g_simBuffers[0].height
     };
 
-    c.left = c.x = holePos.x/dx;
+    c.left = c.x = 0.5f + holePos.x/dx;
     c.y = holePos.y/dx;
     glUniform4f(g_msdfGlyph.u_color, 0.2f, 1.f, 0.f, opacity);
     drawGlyph(&c, &centeredArrow);
@@ -771,6 +822,7 @@ void resetGame() {
     paused = 0;
     debugView = 0;
     score = 0;
+    activeMeasurements = 0;
 
     float simWidth = dx * (float)g_simBuffers[0].width;
     float simHeight = dx * (float)g_simBuffers[0].height;
@@ -842,7 +894,7 @@ int gameLoop() {
             if (debugViewIdx % 3 == 0) renderDebug(g_dragPot.texture, 5e-2f, 0.f, 0.f, 0.f);
             else if (debugViewIdx % 3 == 1) renderDebug(g_dragLIP.layers[0].texture, 1e-3f, 0.f, 0.f, 0.f);
             else renderDebug(g_simBuffers[curBuf].texture, 1e-3f, 0.f, 0.f, 0.f);
-        } else renderGame(!gameWon);
+        } else renderGame(paused||puttActive? 0.f:(float)frameDuration, !gameWon);
 
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

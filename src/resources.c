@@ -109,15 +109,20 @@ int loadResources() {
     if (g_renderer.prog.id == 0) return 1;
     EXPECT_UNIFORM(&g_renderer.vert, u_scale);
     EXPECT_UNIFORM(&g_renderer.vert, u_shift);
-    EXPECT_UNIFORM(&g_renderer, u_pdf);
-    EXPECT_UNIFORM(&g_renderer, u_totalProb);
-    EXPECT_UNIFORM(&g_renderer, u_simSize);
-    EXPECT_UNIFORM(&g_renderer, u_puttActive);
-    EXPECT_UNIFORM(&g_renderer, u_putt);
+    FIND_UNIFORM(&g_renderer, u_cur);
+    FIND_UNIFORM(&g_renderer, u_pdf);
+    FIND_UNIFORM(&g_renderer, u_totalProb);
+    FIND_UNIFORM(&g_renderer, u_simSize);
+    FIND_UNIFORM(&g_renderer, u_puttActive);
+    FIND_UNIFORM(&g_renderer, u_putt);
     FIND_UNIFORM(&g_renderer, u_colormap);
     FIND_UNIFORM(&g_renderer, u_skybox);
     FIND_UNIFORM(&g_renderer, u_light);
+    FIND_UNIFORM(&g_renderer, u_potential);
     FIND_UNIFORM(&g_renderer, u_wall);
+    FIND_UNIFORM(&g_renderer, u_drContourThickness);
+    FIND_UNIFORM(&g_renderer, u_contourProgress);
+    FIND_UNIFORM(&g_renderer, u_contourSep);
 
     g_debugRenderer.prog.id = compileAndLinkFragProgram(
         &surfaceShader, g_basePath, g_debugRenderer.prog.name, "o_color"
@@ -211,14 +216,10 @@ int loadResources() {
 
     g_courseWall.prog.id = compileAndLinkFragProgram(&surfaceShader, g_basePath, g_courseWall.prog.name, "o_wall");
     if (g_courseWall.prog.id == 0) return 1;
-    EXPECT_UNIFORM(&g_courseWall.vert, u_scale);
-    EXPECT_UNIFORM(&g_courseWall.vert, u_shift);
     FIND_UNIFORM(&g_courseWall, u_simSize);
 
     g_coursePotential.prog.id = compileAndLinkFragProgram(&surfaceShader, g_basePath, g_coursePotential.prog.name, "o_potential");
     if (g_coursePotential.prog.id == 0) return 1;
-    EXPECT_UNIFORM(&g_coursePotential.vert, u_scale);
-    EXPECT_UNIFORM(&g_coursePotential.vert, u_shift);
     FIND_UNIFORM(&g_coursePotential, u_simSize);
 
     g_fillColor.prog.id = compileAndLinkFragProgram(&identityShader, g_basePath, g_fillColor.prog.name, "o_color");
@@ -240,8 +241,6 @@ int loadResources() {
     glBindFramebuffer(GL_FRAMEBUFFER, g_potentialBuffer.fbo);
     glViewport(0, 0, simWidth, simHeight);
     glUseProgram(g_coursePotential.prog.id);
-    glUniform2f(g_coursePotential.vert.u_shift, 0.f, 0.f);
-    glUniform2f(g_coursePotential.vert.u_scale, 1.f, 1.f);
     glUniform2f(g_coursePotential.u_simSize, (float)simWidth, (float)simHeight);
     drawQuad();
     glViewport(0, 0, g_drWidth, g_drHeight);
@@ -252,8 +251,6 @@ int loadResources() {
     glBindFramebuffer(GL_FRAMEBUFFER, g_wallBuffer.fbo);
     glViewport(0, 0, simWidth, simHeight);
     glUseProgram(g_courseWall.prog.id);
-    glUniform2f(g_courseWall.vert.u_shift, 0.f, 0.f);
-    glUniform2f(g_courseWall.vert.u_scale, 1.f, 1.f);
     glUniform2f(g_courseWall.u_simSize, (float)simWidth, (float)simHeight);
     drawQuad();
     glViewport(0, 0, g_drWidth, g_drHeight);
