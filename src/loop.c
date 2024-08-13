@@ -30,7 +30,7 @@ static int paused = 0;
 static int debugView = 0;
 static int score = 0;
 static int par = 5;
-static size_t debugViewIdx = 0;
+static int debugViewIdx = 0;
 static SDL_Point puttStart;
 static SDL_Rect drDisplayArea;
 float displayScale;
@@ -608,7 +608,7 @@ void updateStats() {
 }
 
 
-void renderStats() {
+void renderStatusBar() {
     glUseProgram(g_fillColor.prog.id);
     int headerHeight = 40 * g_drHeight / g_scHeight;
     glViewport(0, g_drHeight - headerHeight, g_drWidth, headerHeight);
@@ -686,6 +686,20 @@ void renderStats() {
     glUniform4fv(g_msdfGlyph.u_color, 1, mainColor);
     drawString(&c, text);
     SDL_free(text);
+
+    c.left = c.x = 5.f;
+    c.y -= 30.f;
+    c.size = 18.f;
+
+    if (debugView) {
+        glUniform4f(g_msdfGlyph.u_color, 0.75f, 0.75f, 0.75f, 1.f);
+        drawString(&c, "Debug view.  Press [D] to return to normal view\n");
+        drawString(&c, "Left and right arrows to change view\n");
+    }
+
+    if (paused) {
+        drawString(&c, "Game is paused, press [P] to unpause\n");
+    }
 }
 
 void renderWinScreen() {
@@ -932,7 +946,7 @@ int gameLoop() {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         if (debugView) {
             if (debugViewIdx % 3 == 0) renderDebug(g_dragPot.texture, 5e-2f, 0.f, 0.f, 0.f);
-            else if (debugViewIdx % 3 == 1) renderDebug(g_dragLIP.layers[0].texture, 1e-3f, 0.f, 0.f, 0.f);
+            else if ((debugViewIdx-1) % 3 == 0) renderDebug(g_dragLIP.layers[0].texture, 1e-3f, 0.f, 0.f, 0.f);
             else renderDebug(g_simBuffers[curBuf].texture, 1e-3f, 0.f, 0.f, 0.f);
         } else renderGame(paused||puttActive? 0.f:(float)frameDuration, !gameWon);
 
@@ -944,10 +958,10 @@ int gameLoop() {
             gameWon = 1;
             puttActive = 0;  // currently unnecessary
         }
-        renderStats();
+        renderStatusBar();
 
         if (!gameWon) {
-            renderHoleArrow(frameDuration);
+            renderHoleArrow((float)frameDuration);
         }
 
         if (gameWon) {
@@ -995,8 +1009,10 @@ int gameLoop() {
                     activeMeasurements = 0;
                 } else if (e.key.keysym.sym == SDLK_d) {
                     debugView = !debugView;
-                } else if (e.key.keysym.sym == SDLK_a) {
-                    debugViewIdx++;
+                } else if (e.key.keysym.sym == SDLK_LEFT) {
+                    if (debugView) debugViewIdx--;
+                } else if (e.key.keysym.sym == SDLK_RIGHT) {
+                    if (debugView) debugViewIdx++;
                 } else if (e.key.keysym.sym == SDLK_SPACE) {
                     if (gameWon) break;
                     doMeasurement(initialSigma);
