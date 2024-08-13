@@ -48,8 +48,9 @@ vortices, measurement can be useful tool to get rid of them.
 Controls:
 * Click and drag to putt.
 * Scroll up and down (or use `[` and `]`) to adjust the radius of the putt-wave.
-* Press space to measure position.  This will re-localize the particle's wavefunction.
-* Press `R` to restart
+* Spacebar to measure position.  This will re-localize the particle.
+* `R` to restart.
+* `P` to pause.
 
 By adjusting the radius of the putt-wave, you can change how localized the effect of putt on the momentum of the golf
 ball is.  The biggest and most uniform effect on momentum is inside this radius (where the de Broglie wavelength of the
