@@ -5,7 +5,7 @@ Features:
 * Fast, GPU-accelerated simulation of the time-dependent Schrödinger equation.
 * Energy dissipation with quantum analog to a linear drag force.
 * Putting: hit the quantum golf-ball around using a golf club "putt-wave" with adjustable radius.
-* Measurement of position (though it's currently not implemented as a proper partial measurement).
+* Simultaneous partial measurement of position and momentum.
 * Play golf, not dice: Although the randomness of measurement can be helpful, you can win with putting alone (which is not random).
 * Fancy pseudo-3D graphics
 
@@ -48,8 +48,7 @@ vortices, measurement can be useful tool to get rid of them.
 Controls:
 * Click and drag to putt.
 * Scroll up and down (or use `[` and `]`) to adjust the radius of the putt-wave.
-* Press space to measure position.  Although it's intended to resemble a partial measurement, currently the
-  post-measurement state always has $\langle{}p\rangle = 0$ which isn't very realistic.
+* Press space to measure position.  This will re-localize the particle's wavefunction.
 * Press `R` to restart
 
 By adjusting the radius of the putt-wave, you can change how localized the effect of putt on the momentum of the golf

@@ -753,6 +753,34 @@ void renderHoleArrow(float seconds) {
 }
 
 
+// origin and size are in simulation grid units
+void setPutt(SDL_FPoint origin, float size, float px, float py, float phase) {
+    glViewport(0, 0, g_puttBuffer.width, g_puttBuffer.height);
+    glBindFramebuffer(GL_FRAMEBUFFER, g_puttBuffer.fbo);
+    glUseProgram(g_putt.prog.id);
+
+    glUniform2f(g_putt.vert.u_scale, dx * (float)g_puttBuffer.width, dx * (float)g_puttBuffer.height);
+    glUniform2f(g_putt.vert.u_shift, -dx * origin.x, -dx * origin.y);
+
+    glUniform1f(g_putt.u_clubRadius, dx * size);
+    glUniform2f(g_putt.u_momentum, px, py);
+    glUniform1f(g_putt.u_phase, phase);
+
+    drawQuad();
+}
+
+
+void setPlaneWavePutt(float px, float py) {
+    glViewport(0, 0, g_puttBuffer.width, g_puttBuffer.height);
+    glBindFramebuffer(GL_FRAMEBUFFER, g_puttBuffer.fbo);
+    glUseProgram(g_planeWave.prog.id);
+    glUniform2f(g_planeWave.vert.u_scale, dx * (float)g_puttBuffer.width, dx * (float)g_puttBuffer.height);
+    glUniform2f(g_planeWave.u_momentum, px, py);
+
+    drawQuad();
+}
+
+
 #define MAX_MEASUREMENTS 100
 static size_t activeMeasurements = 0;
 static SDL_Point measurements[MAX_MEASUREMENTS];
@@ -788,31 +816,42 @@ void showMeasurements() {
     }
 }
 
+void doMeasurement(float sigma) {
+    // This is meant to behave similarly to a partial measurement of
+    // position.  The post measurement state is a gaussian wavepacket
+    // with radius given by sigma (sqrt(2)*standard deviation, as in
+    // setGaussianWavepacket).
+    // It has a central position randomly sampled from the PDF and a
+    // central momentum given by the phase gradient at the central
+    // position.
+    // Basically everything about this is wrong in some way:
+    //  * When there are walls, it shouldn't necessarily be a gaussian
+    //    (I believe more generally it should be a heat kernel)
+    //  * Sampling position from the PDF only makes sense for an ideal
+    //    measurement of position (delta functions).
+    //  * Using the local phase gradient to set the momentum makes very
+    //    little sense at all.  But hopefully the player won't notice.
+    SDL_Point pos = samplePyramid(&g_pdfPyramid);
+    glBindFramebuffer(GL_FRAMEBUFFER, g_simBuffers[curBuf].fbo);
+    float quad[3*4];
+    glReadPixels(
+        SDL_min(pos.x, g_simBuffers[0].width-2), SDL_min(pos.y, g_simBuffers[0].height-2),
+        2, 2, GL_RGB, GL_FLOAT, &quad
+    );
+    float r0 = quad[0*3 + 0];
+    float i0 = quad[0*3 + 1];
+    float rx = quad[1*3 + 0];
+    float ix = quad[1*3 + 1];
+    float ry = quad[2*3 + 0];
+    float iy = quad[2*3 + 1];
 
-// origin and size are in simulation grid units
-void setPutt(SDL_FPoint origin, float size, float px, float py, float phase) {
-    glViewport(0, 0, g_puttBuffer.width, g_puttBuffer.height);
-    glBindFramebuffer(GL_FRAMEBUFFER, g_puttBuffer.fbo);
-    glUseProgram(g_putt.prog.id);
+    float px = atan2f(r0*ix - i0*rx, r0*rx + i0*ix)/dx;
+    float py = atan2f(r0*iy - i0*ry, r0*ry + i0*iy)/dx;
+    SDL_Log("%f %f", px, py);
 
-    glUniform2f(g_putt.vert.u_scale, dx * (float)g_puttBuffer.width, dx * (float)g_puttBuffer.height);
-    glUniform2f(g_putt.vert.u_shift, -dx * origin.x, -dx * origin.y);
-
-    glUniform1f(g_putt.u_clubRadius, dx * size);
-    glUniform2f(g_putt.u_momentum, px, py);
-    glUniform1f(g_putt.u_phase, phase);
-
-    drawQuad();
-}
-
-void setPlaneWavePutt(float px, float py) {
-    glViewport(0, 0, g_puttBuffer.width, g_puttBuffer.height);
-    glBindFramebuffer(GL_FRAMEBUFFER, g_puttBuffer.fbo);
-    glUseProgram(g_planeWave.prog.id);
-    glUniform2f(g_planeWave.vert.u_scale, dx * (float)g_puttBuffer.width, dx * (float)g_puttBuffer.height);
-    glUniform2f(g_planeWave.u_momentum, px, py);
-
-    drawQuad();
+    initPhysics(dx*(float)pos.x, dx*(float)pos.y, sigma);
+    setPlaneWavePutt(px, py);
+    applyPutt();
 }
 
 
@@ -959,8 +998,7 @@ int gameLoop() {
                     debugViewIdx++;
                 } else if (e.key.keysym.sym == SDLK_SPACE) {
                     if (gameWon) break;
-                    SDL_Point measurement = samplePyramid(&g_pdfPyramid);
-                    initPhysics(dx*(float)measurement.x, dx*(float)measurement.y, initialSigma);
+                    doMeasurement(initialSigma);
                     score += 1; // 1/2
                 } else if (e.key.keysym.sym == SDLK_m) {
                     makeMeasurements();
