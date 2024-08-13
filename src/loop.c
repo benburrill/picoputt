@@ -66,6 +66,19 @@ void setGaussianWavepacket(TexturedFrameBuffer *tfb, float x0, float y0, float s
 }
 
 
+void pyramidReduce(ProgReduce *reduction, PaddedPyramidBuffer *pyramid, GLint texUnit) {
+    glUseProgram(reduction->prog.id);
+    glUniform1i(reduction->u_src, texUnit);
+    glActiveTexture(GL_TEXTURE0 + texUnit);
+    for (int i = 1; i < pyramid->numLayers; i++) {
+        glBindFramebuffer(GL_FRAMEBUFFER, pyramid->layers[i].buf.fbo);
+        glViewport(0, 0, pyramid->layers[i].dataWidth, pyramid->layers[i].dataHeight);
+        glBindTexture(GL_TEXTURE_2D, pyramid->layers[i - 1].buf.texture);
+        drawQuad();
+    }
+}
+
+
 void initPhysics(float x0, float y0, float sigma) {
     setGaussianWavepacket(&g_simBuffers[0], x0, y0, sigma, dx);
 
@@ -122,20 +135,17 @@ void initPhysics(float x0, float y0, float sigma) {
     glClear(GL_COLOR_BUFFER_BIT);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+    glViewport(0, 0, g_simBuffers[0].width, g_simBuffers[0].height);
+    glUseProgram(g_pdf.prog.id);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, g_simBuffers[1].texture);
+    glUniform1i(g_pdf.u_cur, 1);
+    glUniform1i(g_pdf.u_prev, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, g_pdfPyramid.layers[0].buf.fbo);
+    drawQuad();
+    pyramidReduce(&g_rsumReduce, &g_pdfPyramid, 2);
+
     updateDisplayInfo();
-}
-
-
-void pyramidReduce(ProgReduce *reduction, PaddedPyramidBuffer *pyramid, GLint texUnit) {
-    glUseProgram(reduction->prog.id);
-    glUniform1i(reduction->u_src, texUnit);
-    glActiveTexture(GL_TEXTURE0 + texUnit);
-    for (int i = 1; i < pyramid->numLayers; i++) {
-        glBindFramebuffer(GL_FRAMEBUFFER, pyramid->layers[i].buf.fbo);
-        glViewport(0, 0, pyramid->layers[i].dataWidth, pyramid->layers[i].dataHeight);
-        glBindTexture(GL_TEXTURE_2D, pyramid->layers[i - 1].buf.texture);
-        drawQuad();
-    }
 }
 
 
