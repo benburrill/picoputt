@@ -484,11 +484,11 @@ void renderGame(float seconds, int showClub) {
 
     SDL_Point mouse;
     SDL_GetMouseState(&mouse.x, &mouse.y);
-    float lx = (float)g_scWidth / 2 - (float)mouse.x;
-    float ly = (float)mouse.y - (float)g_scHeight / 2;
-    float lz = -0.2f*(float)g_scWidth;
-    float mag = sqrtf(lx*lx + ly*ly + lz*lz);
-    glUniform3f(g_renderer.u_light, lx/mag, ly/mag, lz/mag);
+    SDL_FPoint mouseUV = {
+        (float)(mouse.x - drDisplayArea.x)/(float)drDisplayArea.w,
+        (float)(drDisplayArea.h - mouse.y - drDisplayArea.y)/(float)drDisplayArea.h
+    };
+    glUniform2f(g_renderer.u_mouse, mouseUV.x, mouseUV.y);
 
     drawQuad();
 
@@ -847,11 +847,12 @@ void doMeasurement(float sigma) {
 
     float px = atan2f(r0*ix - i0*rx, r0*rx + i0*ix)/dx;
     float py = atan2f(r0*iy - i0*ry, r0*ry + i0*iy)/dx;
-    SDL_Log("%f %f", px, py);
 
     initPhysics(dx*(float)pos.x, dx*(float)pos.y, sigma);
     setPlaneWavePutt(px, py);
     applyPutt();
+    // measurements[0] = pos;
+    // activeMeasurements = 1;
 }
 
 

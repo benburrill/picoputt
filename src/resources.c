@@ -117,7 +117,7 @@ int loadResources() {
     FIND_UNIFORM(&g_renderer, u_putt);
     FIND_UNIFORM(&g_renderer, u_colormap);
     FIND_UNIFORM(&g_renderer, u_skybox);
-    FIND_UNIFORM(&g_renderer, u_light);
+    FIND_UNIFORM(&g_renderer, u_mouse);
     FIND_UNIFORM(&g_renderer, u_potential);
     FIND_UNIFORM(&g_renderer, u_wall);
     FIND_UNIFORM(&g_renderer, u_drContourThickness);
@@ -214,11 +214,11 @@ int loadResources() {
     FIND_UNIFORM(&g_msdfGlyph.base, u_pxrange);
     EXPECT_UNIFORM(&g_msdfGlyph, u_color);
 
-    g_courseWall.prog.id = compileAndLinkFragProgram(&surfaceShader, g_basePath, g_courseWall.prog.name, "o_wall");
+    g_courseWall.prog.id = compileAndLinkFragProgram(&identityShader, g_basePath, g_courseWall.prog.name, "o_wall");
     if (g_courseWall.prog.id == 0) return 1;
     FIND_UNIFORM(&g_courseWall, u_simSize);
 
-    g_coursePotential.prog.id = compileAndLinkFragProgram(&surfaceShader, g_basePath, g_coursePotential.prog.name, "o_potential");
+    g_coursePotential.prog.id = compileAndLinkFragProgram(&identityShader, g_basePath, g_coursePotential.prog.name, "o_potential");
     if (g_coursePotential.prog.id == 0) return 1;
     FIND_UNIFORM(&g_coursePotential, u_simSize);
 

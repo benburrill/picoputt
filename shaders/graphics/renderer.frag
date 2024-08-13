@@ -17,7 +17,7 @@ uniform bool u_puttActive;
 uniform sampler2D u_putt;
 uniform sampler2D u_colormap;
 uniform samplerCube u_skybox;
-uniform vec3 u_light;
+uniform vec2 u_mouse;
 uniform float u_drContourThickness;// = 0.5;
 uniform float u_contourProgress;// = 0.;
 uniform float u_contourSep;// = 0.01;
@@ -57,10 +57,12 @@ void main() {
 
     vec3 reflCol = texture(u_skybox, reflect(eye, norm)).rgb;
 
-    float diffuse = max(0., dot(-u_light, norm));
+    vec3 light = normalize(vec3((v_pos - u_mouse)*u_simSize, -0.1*(u_simSize.x+u_simSize.y)));
+
+    float diffuse = max(0., dot(-light, norm));
     vec3 diffuseCol = mix(ambCol, vec3(1., 1., 1.), 0.2) * lightness;
 
-    float spec = pow(max(0., dot(reflect(u_light, norm), -eye)), 10.);
+    float spec = pow(max(0., dot(reflect(light, norm), -eye)), 10.);
     vec3 specCol = mix(ambCol, vec3(1., 1., 1.), 0.8) * lightness;
     //spec=diffuse; specCol=diffuseCol;
 

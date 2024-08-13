@@ -57,7 +57,7 @@ typedef struct {
     GLint u_putt;
     GLint u_colormap;
     GLint u_skybox;
-    GLint u_light;
+    GLint u_mouse;
     GLint u_potential;
     GLint u_wall;
     GLint u_drContourThickness;
