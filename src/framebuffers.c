@@ -54,7 +54,9 @@ void emptyTexImage2D(GLenum target, GLint level, GLsizei width, GLsizei height, 
         glPixelStorei(GL_UNPACK_SKIP_ROWS, 0);
     }
 
-    glTexImage2D(target, level, internalformat, width, height, 0, format, GL_BYTE, data);
+    // We must use GL_UNSIGNED_BYTE rather than GL_BYTE to ensure that
+    // the alternate mapping of signed integers (0 -> 1/255) is not used
+    glTexImage2D(target, level, internalformat, width, height, 0, format, GL_UNSIGNED_BYTE, data);
 
     if (!uninitialized) free(data);
 }

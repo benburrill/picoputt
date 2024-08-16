@@ -39,8 +39,8 @@ void main() {
     // gradient has units of height/pixel of the wavefunction texture
     vec2 d = 1./u_simSize;
     vec2 grad = scale * vec2(
-        (textureLod(u_pdf, v_pos + vec2(d.x, 0), 0).r - textureLod(u_pdf, v_pos + vec2(-d.x, 0), 0).r) / 2.,
-        (textureLod(u_pdf, v_pos + vec2(0, d.y), 0).r - textureLod(u_pdf, v_pos + vec2(0, -d.y), 0).r) / 2.
+        (textureLod(u_pdf, v_pos + vec2(d.x, 0.), 0).r - textureLod(u_pdf, v_pos + vec2(-d.x, 0.), 0).r) / 2.,
+        (textureLod(u_pdf, v_pos + vec2(0., d.y), 0).r - textureLod(u_pdf, v_pos + vec2(0., -d.y), 0).r) / 2.
     );
 
     vec3 norm = normalize(vec3(-grad, 50./(u_simSize.x+u_simSize.y)));
@@ -80,7 +80,7 @@ void main() {
     float dV = length(vec2(dFdx(V), dFdy(V)));
     if (dV != 0.) {
         float contourDist = u_contourSep*abs(fract(V/u_contourSep + u_contourProgress) - 0.5) / dV;
-        Vcolor = mix(vec3(0.3, 0.1, 0.1), Vcolor, clamp(contourDist - u_drContourThickness, 0, 1.));
+        Vcolor = mix(vec3(0.3, 0.1, 0.1), Vcolor, clamp(contourDist - u_drContourThickness, 0., 1.));
     }
 
     o_color = vec4(mix(Vcolor, o_color.rgb, clamp(height + 0.3, 0., 0.9)), 1.);
