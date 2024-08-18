@@ -14,6 +14,7 @@ int g_scWidth;
 int g_scHeight;
 int g_drWidth;
 int g_drHeight;
+static int loadedGL = 0;
 
 // startGame should set a SDL error on failure.
 // We are also adding additional context to SDL errors to try to make
@@ -73,6 +74,7 @@ int startGame() {
             return 1;
         }
     }
+    loadedGL = 1;
 
     SDL_version linked;
     SDL_GetVersion(&linked);
@@ -95,13 +97,16 @@ int startGame() {
 
 
 void quitGame() {
-    logGlErrors();
-    freeResources();
-    destroyQuad();
+    if (loadedGL) {
+        logGlErrors();
+        freeResources();
+        destroyQuad();
+    }
 
     if (g_GLContext != NULL) {
         SDL_GL_DeleteContext(g_GLContext);
         g_GLContext = NULL;
+        loadedGL = 0;
     }
 
     if (g_window != NULL) {

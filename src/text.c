@@ -113,8 +113,9 @@ int loadFont(Font *result, const char *basePath, const char *fontPath, char32_t 
 
 void destroyFont(Font *font) {
     font->numGlyphs = 0;
-    free(font->glyphs);
+    if (font->glyphs) free(font->glyphs);
     glDeleteTextures(1, &font->atlas);
+    font->atlas = 0;
 }
 
 
