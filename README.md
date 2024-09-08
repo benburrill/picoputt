@@ -30,17 +30,18 @@ Measurement also adds to your score, but it only adds 1/2.
 *In other words: measure twice, putt once!*
 
 To win, you need at least **50% probability** of finding the particle in the **local minimum energy state at the goal hole.**
-This state is referred to as the "hole state" $\lvert{\rm hole}\rangle$ and the current probability is displayed in game
-as $P({\rm win})$.
+The hole itself is a potential well which will attract the particle.  The local minimum energy state is referred to as
+the "hole state" $\lvert{\rm hole}\rangle$ and the current probability is displayed in game as $P({\rm win})$.
 
 The location of **the goal hole is indicated with a green arrow**.  When the ball is in the hole state, its probability
 distribution will look like a **stationary round bump** centered at this location.  
 *It may take some time for the drag force to slow the ball down enough to reach sufficient probability in this
 low-energy state.*
 
-However, you might encounter "dents" which never go away, preventing you from winning.  These are **quantum vortices**:
-annoying little quantized bundles of angular momentum, which are not directly affected by the drag force.  If you're
-having trouble dealing with vortices, measurement can be useful tool to get rid of them.
+However, you may find that rather than a round bump, you instead get "divots" in the ball's probability distribution
+which never go away and prevent you from winning.  These are **quantum vortices**: annoying little quantized bundles of
+angular momentum, which are not directly affected by the drag force.  If you're having trouble dealing with vortices,
+measurement can be useful tool to get rid of them.
 
 By adjusting the radius of the putt-wave, you can change how localized the effect of putt on the momentum of the golf
 ball is.  The biggest and most uniform effect on momentum is inside this radius (where the de Broglie wavelength of the
