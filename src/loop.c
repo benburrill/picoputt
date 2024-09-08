@@ -44,6 +44,7 @@ static int curBuf;
 static GLuint perfQuery;
 static double perfQueryTurns;  // Number of turns (nominally 4 qturns) recorded in last perfQuery
 static double maxTurnsPerSecond = (double)PHYS_TURNS_PER_SECOND;
+static int maxTurnsPerSecondFresh = 1;
 
 static GLuint totalProbBuffer;
 static float totalProbability;
@@ -247,6 +248,7 @@ int doPhysics(int turnsNeeded, double maxTime) {
         GLuint64 nsElapsedLastFrame;
         glGetQueryObjectui64v(perfQuery, GL_QUERY_RESULT, &nsElapsedLastFrame);
         maxTurnsPerSecond = perfQueryTurns / (1e-9 * (double)nsElapsedLastFrame);
+        maxTurnsPerSecondFresh = 1;
     }
 
     int startNewQuery = queryDone && turnsNeeded > 0;
@@ -619,10 +621,14 @@ void renderFPS(double fps) {
             fpsHist[i] = fps;
             mtpsHist[i] = maxTurnsPerSecond;
         }
+        maxTurnsPerSecondFresh = 0;
         needsInit = 0;
     } else {
         fpsHist[histIdx] = fps;
-        mtpsHist[histIdx] = maxTurnsPerSecond;
+        if (maxTurnsPerSecondFresh) {
+            mtpsHist[histIdx] = maxTurnsPerSecond;
+            maxTurnsPerSecondFresh = 0;
+        }
         histIdx = (histIdx + 1)%FPS_HISTORY;
     }
 
