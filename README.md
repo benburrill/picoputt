@@ -43,6 +43,8 @@ which never go away and prevent you from winning.  These are **quantum vortices*
 angular momentum, which are not directly affected by the drag force.  If you're having trouble dealing with vortices,
 measurement can be useful tool to get rid of them.
 
+![vortex](https://github.com/user-attachments/assets/7e0d6d4d-3661-44c7-84b8-be53e044b7ba)
+
 By adjusting the radius of the putt-wave, you can change how localized the effect of putt on the momentum of the golf
 ball is.  The biggest and most uniform effect on momentum is inside this radius (where the de Broglie wavelength of the
 putt-wave is shortest and looks approximately like a plane wave).  Outside of this radius, the effect on local momentum
