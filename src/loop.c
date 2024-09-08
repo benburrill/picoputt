@@ -999,9 +999,10 @@ int gameLoop() {
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         if (debugView) {
-            if (debugViewIdx % 3 == 0) renderDebug(g_dragPot.texture, 5e-2f, 0.f, 0.f, 0.f);
-            else if ((debugViewIdx-1) % 3 == 0) renderDebug(g_dragLIP.layers[0].texture, 1e-3f, 0.f, 0.f, 0.f);
-            else renderDebug(g_simBuffers[curBuf].texture, 1e-3f, 0.f, 0.f, 0.f);
+            if (debugViewIdx % 4 == 0) renderDebug(g_dragLIP.layers[0].texture, 1e-3f, 0.f, 0.f, 0.f);
+            else if ((debugViewIdx-1) % 4 == 0) renderDebug(g_simBuffers[curBuf].texture, 1e-3f, 1.f, 0.f, 0.f);
+            else if ((debugViewIdx-2) % 4 == 0) renderDebug(g_goalPyramid.layers[0].buf.texture, 1e-5f, 2.f, 0.f, 0.f);
+            else renderDebug(g_dragPot.texture, 5e-2f, 3.f, 0.f, 0.f);
         } else renderGame(paused||puttActive? 0.f:(float)frameDuration, !gameWon);
 
         glEnable(GL_BLEND);
