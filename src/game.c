@@ -62,7 +62,11 @@ int startGame() {
 
 
     if ((g_GLContext = SDL_GL_CreateContext(g_window)) == NULL) {
-        SDL_SetError("SDL_GL_CreateContext() failed: %s", SDL_GetError());
+        SDL_SetError(
+            "SDL_GL_CreateContext() failed: %s\n"
+            "NOTE: picoputt requires at least OpenGL %d.%d",
+            SDL_GetError(), TARGET_GL_MAJOR_VERSION, TARGET_GL_MINOR_VERSION
+        );
         return 1;
     }
 

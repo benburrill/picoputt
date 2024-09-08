@@ -33,7 +33,7 @@ static int par = 5;
 static int debugViewIdx = 0;
 static SDL_Point puttStart;
 static SDL_Rect drDisplayArea;
-float displayScale;
+static float displayScale;
 static float initialSigma;
 static SDL_FPoint holePos;
 
@@ -41,10 +41,15 @@ static SDL_FPoint holePos;
 // separate variable to keep track of which potential buffer is current.
 static int curBuf;
 
-GLuint perfQuery;
-double perfQueryTurns;  // Number of turns (nominally 4 qturns) recorded in last perfQuery
-double maxTurnsPerSecond = (double)PHYS_TURNS_PER_SECOND;
+static GLuint perfQuery;
+static double perfQueryTurns;  // Number of turns (nominally 4 qturns) recorded in last perfQuery
+static double maxTurnsPerSecond = (double)PHYS_TURNS_PER_SECOND;
 
+static GLuint totalProbBuffer;
+static float totalProbability;
+static GLuint winProbBuffer;
+static float winProbability;
+static int needStatsUpdate;
 
 void setGaussianWavepacket(TexturedFrameBuffer *tfb, float x0, float y0, float sigma, float dx_) {
     // Initializes the tfb with a normalized gaussian wavepacket
@@ -76,6 +81,80 @@ void pyramidReduce(ProgReduce *reduction, PaddedPyramidBuffer *pyramid, GLint te
         glBindTexture(GL_TEXTURE_2D, pyramid->layers[i - 1].buf.texture);
         drawQuad();
     }
+}
+
+void beginComputingStats() {
+    needStatsUpdate = 1;
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, g_simBuffers[0].texture);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, g_simBuffers[1].texture);
+
+    // Begin computation of total probability
+    glViewport(0, 0, g_simBuffers[0].width, g_simBuffers[0].height);
+    glUseProgram(g_pdf.prog.id);
+    glUniform1i(g_pdf.u_cur, 0 + curBuf);
+    glUniform1i(g_pdf.u_prev, 0 + 1 - curBuf);
+    glBindFramebuffer(GL_FRAMEBUFFER, g_pdfPyramid.layers[0].buf.fbo);
+    drawQuad();
+    pyramidReduce(&g_rsumReduce, &g_pdfPyramid, 2);
+
+    if (!totalProbBuffer) {
+        // TODO: totalProbBuffer and winProbBuffer are never deleted
+        glGenBuffers(1, &totalProbBuffer);
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, totalProbBuffer);
+        glBufferData(GL_PIXEL_PACK_BUFFER, sizeof(float), NULL, GL_DYNAMIC_READ);
+    } else {
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, totalProbBuffer);
+    }
+
+    // Already bound: glBindFramebuffer(GL_FRAMEBUFFER, g_pdfPyramid.layers[g_pdfPyramid.numLayers - 1].buf.fbo);
+    glReadPixels(0, 0, 1, 1, GL_RED, GL_FLOAT, NULL);
+
+
+    // Begin computation of win probability
+    glViewport(0, 0, g_simBuffers[0].width, g_simBuffers[0].height);
+    glUseProgram(g_cmul.prog.id);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_2D, g_goalState.texture);
+    glUniform1i(g_cmul.u_left, 2);
+    glUniform1i(g_cmul.u_right, 0 + curBuf);
+    glBindFramebuffer(GL_FRAMEBUFFER, g_goalPyramid.layers[0].buf.fbo);
+    drawQuad();
+    pyramidReduce(&g_rgsumReduce, &g_goalPyramid, 2);
+
+    if (!winProbBuffer) {
+        glGenBuffers(1, &winProbBuffer);
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, winProbBuffer);
+        glBufferData(GL_PIXEL_PACK_BUFFER, 3 * sizeof(float), NULL, GL_DYNAMIC_READ);
+    } else {
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, winProbBuffer);
+    }
+
+    // Already bound: glBindFramebuffer(GL_FRAMEBUFFER, g_goalPyramid.layers[g_goalPyramid.numLayers - 1].buf.fbo);
+    glReadPixels(0, 0, 1, 1, GL_RGB, GL_FLOAT, NULL);
+
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+}
+
+void updateStats() {
+    if (!needStatsUpdate) return;
+    needStatsUpdate = 0;
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, totalProbBuffer);
+    float *sumPDF = glMapBuffer(GL_PIXEL_PACK_BUFFER, GL_READ_ONLY);
+    if (sumPDF) {
+        totalProbability = sumPDF[0] * dx * dx;
+        glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+    }
+
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, winProbBuffer);
+    float *goal = glMapBuffer(GL_PIXEL_PACK_BUFFER, GL_READ_ONLY);
+    if (goal) {
+        winProbability = (goal[0]*goal[0] + goal[1]*goal[1]) * dx * dx / totalProbability;
+        glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+    }
+
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 }
 
 
@@ -134,16 +213,6 @@ void initPhysics(float x0, float y0, float sigma) {
     glClearColor(1.f, 0.f, 0.0f, 1.f);
     glClear(GL_COLOR_BUFFER_BIT);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    glViewport(0, 0, g_simBuffers[0].width, g_simBuffers[0].height);
-    glUseProgram(g_pdf.prog.id);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, g_simBuffers[1].texture);
-    glUniform1i(g_pdf.u_cur, 1);
-    glUniform1i(g_pdf.u_prev, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, g_pdfPyramid.layers[0].buf.fbo);
-    drawQuad();
-    pyramidReduce(&g_rsumReduce, &g_pdfPyramid, 2);
 
     updateDisplayInfo();
 }
@@ -289,24 +358,6 @@ int doPhysics(int turnsNeeded, double maxTime) {
         glEndQuery(GL_TIME_ELAPSED);
         perfQueryTurns = (double)turn;
     }
-
-    glViewport(0, 0, g_simBuffers[0].width, g_simBuffers[0].height);
-    glUseProgram(g_pdf.prog.id);
-    glUniform1i(g_pdf.u_cur, 0 + curBuf);
-    glUniform1i(g_pdf.u_prev, 0 + 1 - curBuf);
-    glBindFramebuffer(GL_FRAMEBUFFER, g_pdfPyramid.layers[0].buf.fbo);
-    drawQuad();
-    pyramidReduce(&g_rsumReduce, &g_pdfPyramid, 2);
-
-    glViewport(0, 0, g_simBuffers[0].width, g_simBuffers[0].height);
-    glUseProgram(g_cmul.prog.id);
-    glActiveTexture(GL_TEXTURE2);
-    glBindTexture(GL_TEXTURE_2D, g_goalState.texture);
-    glUniform1i(g_cmul.u_left, 2);
-    glUniform1i(g_cmul.u_right, 0 + curBuf);
-    glBindFramebuffer(GL_FRAMEBUFFER, g_goalPyramid.layers[0].buf.fbo);
-    drawQuad();
-    pyramidReduce(&g_rgsumReduce, &g_goalPyramid, 2);
 
     return turnsNeeded - turn;
 }
@@ -603,21 +654,6 @@ void renderFPS(double fps) {
 }
 
 
-static float winProbability;
-static float totalProbability;
-void updateStats() {
-    float sumPDF;
-    glBindFramebuffer(GL_FRAMEBUFFER, g_pdfPyramid.layers[g_pdfPyramid.numLayers - 1].buf.fbo);
-    glReadPixels(0, 0, 1, 1, GL_RED, GL_FLOAT, &sumPDF);
-    totalProbability = sumPDF * dx * dx;
-
-    float goal[3];
-    glBindFramebuffer(GL_FRAMEBUFFER, g_goalPyramid.layers[g_goalPyramid.numLayers - 1].buf.fbo);
-    glReadPixels(0, 0, 1, 1, GL_RGB, GL_FLOAT, &goal);
-    winProbability = (goal[0]*goal[0] + goal[1]*goal[1]) * dx * dx / totalProbability;
-}
-
-
 void renderStatusBar() {
     glUseProgram(g_fillColor.prog.id);
     int headerHeight = 40 * g_drHeight / g_scHeight;
@@ -875,6 +911,7 @@ void doMeasurement(float sigma) {
     initPhysics(dx*(float)pos.x, dx*(float)pos.y, sigma);
     setPlaneWavePutt(px, py);
     applyPutt();
+    beginComputingStats();
     // measurements[0] = pos;
     // activeMeasurements = 1;
 }
@@ -902,6 +939,7 @@ void resetGame() {
 
     // setPlaneWavePutt(0.5f, 0.f);
     // applyPutt();
+    beginComputingStats();
 }
 
 int gameLoop() {
@@ -929,7 +967,7 @@ int gameLoop() {
                 1. / MIN_FPS
             );
             slopTime = fmod(slopTime, 1. / PHYS_TURNS_PER_SECOND);
-            updateStats();
+            beginComputingStats();
         } else if (puttActive) {
             int mouseX, mouseY;
             SDL_GetMouseState(&mouseX, &mouseY);
@@ -963,6 +1001,7 @@ int gameLoop() {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         showMeasurements();
+        updateStats();
         if (winProbability >= winThreshold) {
             paused = paused || !gameWon;
             gameWon = 1;
@@ -1003,6 +1042,7 @@ int gameLoop() {
                 if (puttActive) {
                     puttActive = 0;
                     applyPutt();
+                    beginComputingStats();  // Update stats even when paused
                     score += 2; // 2/2
                 }
                 break;
