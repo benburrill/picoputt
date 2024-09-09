@@ -61,7 +61,7 @@ If you need an extra challenge, here are some things you can try:
 
 
 ## Technical details
-Note: I use units of $\hbar = 1$, so if ever the units don't make sense, hopefully it's because of that and not because I'm a klutz.
+Note: I use units of $\hbar = 1$, so if the units don't make sense, hopefully it's because of that and not because I'm a klutz.
 
 ### Quantum simulation
 The time-dependent Schrödinger equation, which describes the evolution of a quantum particle, can be written as
@@ -75,7 +75,7 @@ The most obvious way we might think of to simulate this is to directly apply Eul
 
 ```python
 while True:
-    psi -= dt * 1j * H(psi)
+  psi -= dt * 1j * H(psi)
 ```
 
 Unfortunately, this method is unstable!  It will always blow up, no matter how small you choose `dt`.
@@ -85,14 +85,18 @@ We just need perform staggered updates to the real and imaginary components of t
 
 ```python
 while True:
-    real += dt * H(imag)
-    imag -= dt * H(real)
+  real += dt * H(imag)
+  imag -= dt * H(real)
 ```
+
+<details>
+<summary>Some notes on the stability of the Visscher algorithm (click for details)</summary>
 
 TODO: talk about stability, level shifts
 
 For a 2D grid, I found that a 9-point stencil is necessary for the Laplacian in order to reach the theoretical stability bounds
 (with a 5-point stencil, the stability region shrinks by a factor of 2).
+</details>
 
 To simplify writing the algorithm with a single shader to run on the GPU,
 I actually implement the Visscher algorithm slightly differently from this, using what I call a "qturn" (short for quarter turn).
@@ -101,7 +105,7 @@ A qturn is a single Euler step of the real component of the wavefunction followe
 
 ```python
 while True:
-    real, imag = -imag, real + dt * H(imag)
+  real, imag = -imag, real + dt * H(imag)
 ```
 
 Of course this is just a minor implementation detail, but I emphasize it because it affects the terminology I use.
@@ -114,14 +118,15 @@ which could be run in one second on your machine (based on the average time take
 
 The code can be found in [qturn.frag](shaders/qturn.frag).
 
-
 ### Quantum drag force
-Energy dissipation is an essential feature of the game.  Picoputt uses a quantum analogue for a linear drag force ($F=-bv$), which I call "phase drag".
-It is not the *only* way to get something that acts like a drag force, and certainly not the only way to get some kind of dissipative effect,
+Energy dissipation is an essential feature of the game.  Picoputt uses a quantum analogue (which I call "phase drag")
+to the linear drag force $F=-bv$.
+It is not the *only* way to get something that acts like a drag force,
+and certainly not the only way to get some kind of dissipative effect,
 but of the possibilities I considered, I believe it is the best.
 
-The idea is to use the spatial phase gradient, $\nabla{}\theta(\vec{x})$ of a wavefunction $\Psi(\vec{x}) = r(\vec{x})e^{i\theta(\vec{x})}$
-as a measure of local momentum for the drag force to act on.
+The idea is to use the spatial phase gradient, $\nabla{}\theta(\vec{x})$ of a wavefunction
+$\Psi(\vec{x}) = r(\vec{x})e^{i\theta(\vec{x})}$ as a measure of local momentum for the drag force to act on.
 If in one time step $\Delta{}t$, linear drag would scale a particle's momentum by a factor of $\alpha=e^{-b{}\Delta{}t/m}$,
 then phase drag should likewise scale the phase gradient, transforming $\Psi$ to $r(\vec{x})e^{i(\alpha\theta(\vec{x}) + C)}$
 with any constant $C$ (which contributes an unobservable global phase shift).
@@ -139,19 +144,22 @@ rescale the phase gradient, $\left\langle{}p\right\rangle = \left\langle\alpha\n
 
 Another way to think about this is to define a drag potential $V_{drag} = b\theta{}(\vec{x})$, which we can add to the Hamiltonian.
 
-Admittedly, by defining $\theta{}(\vec{x})$, I have concealed some ugly mathematical ambiguities.
+<details>
+<summary>Admittedly, by defining $\theta{}(\vec{x})$, I have concealed some mathematical ambiguities (click for the ugly truth).</summary>
+
 The complex logarithm is multivalued, so for any wavefunction, there are infinitely many $\theta{}(\vec{x})$ functions to choose from.
 Although we can unambiguously determine $\nabla{}\theta$ everywhere (ignoring nodes), it is not always possible for $\theta$ to be continuous if there are periodic boundary conditions.
 This occurs in the case of quantum vortices/eigenstates of angular momentum (more concretely, think of $\nabla{}\theta$ pointing "tangentially along the orbit").
 In such cases, for $\Psi$ to be continuous, $\theta$ must have a $2\pi{}n$ discontinuity.
 So (except for certain quantized increments), if we attempt to rescale $\nabla{}\theta$, then $\Psi$ will inevitably get a discontinuity *somewhere*,
 and worse, the location of this discontinuity is not even well-defined!
+</details>
 
 The simplest way to deal with this problem is to somewhat arbitrarily say that the drag force only acts on the irrotational component of the phase gradient.
 More formally, we can define $V_{drag}$ as a solution to $\nabla^2{}V_{drag} = b\nabla{}\cdot(\nabla{}\theta)$ satisfying appropriate boundary conditions
 (which are a bit messy since $\theta$ is undefined at the boundary).
 
-However, in picoputt, I do not actually solve this equation.  Instead I use a fast and loose algorithm that mostly kinda works to approximate $V_{drag}$.
+However, in picoputt, I do not actually solve this equation.  Instead, I use a fast and loose algorithm that mostly kinda works to approximate $V_{drag}$.
 See the section on [LIP integration](#lip-integration) for more details.
 
 ### LIP integration
@@ -192,7 +200,7 @@ TODO: explain with plots and diagrams, arctan(1/2)-arctan(1)/2 = arctan(1/2)-pi/
 Encouraged by this early success (and hypnotized by the pretty fractal patterns),
 I set out on a futile and somewhat pointless quest to "correctly" generalize the algorithm for other grid sizes.
 
-Long story short, after a embarrassingly long time trying to generalize the algorithm
+Long story short, after an embarrassingly long time trying to generalize the algorithm
 (and trying to understand better what my algorithms were even doing mathematically),
 I had to throw in the towel as I was getting nowhere.
 Whenever I felt I had a promising idea, it was crap, but random nonsense tweaks sometimes improved things.
@@ -207,8 +215,33 @@ TODO: explain what I'm doing, and what parts of it are weird
 
 TODO: explain problem of discontinuities at walls - heat kernels as solution?
 
-### Local minimum energy state
-The winning "hole state" is an approximation of the local minimum energy state, obtained by finding the ground state of a local approximation of the Hamiltonian at the hole.
+### Winning
+The winning "hole state" is supposed to be the local minimum energy state.  So what do I actually mean by that?  
+Honestly, I'm not sure exactly.  But no matter: approximate understanding ought to be good enough for an approximation.
+Intuitively, we should expect that the ground state of a good local approximation of the Hamiltonian will be a good
+approximation of the local minimum energy state.  And we can tell it works if when you put the particle into that state
+it stays put, even when subject to the drag force.
+
+I currently put a cosine potential well at the holes. Locally, we can approximate this as a harmonic oscillator,
+for which the ground state is a Gaussian.
+
+### Putt wave
+When the player putts, we essentially want to apply some impulse $\Delta{}\vec{p}$ to the wavefunction.
+The simplest way to do this would be to multiply the wavefunction with the plane wave $e^{i\Delta{}\vec{p}\cdot\vec{x}}$.
+However, to give the player some more control, I wanted to limit the effect of the putt to some circular region.
+
+In other words I wanted some function $e^{-i\theta{}(\vec{x})}$, where inside a radius $r$, it is approximately a plane wave,
+and for $\left|\vec{x}\right|\gg{}r$, $\left|{\nabla{}\theta{}(\vec{x})}\right|\to0$ as quickly and as radially symmetrically as possible.
+
+To accomplish this, I chose (for $\Delta{}\vec{p}$ along $\hat{x}$):
+
+```math
+\theta(x, y) = \Delta{}pr\arctan\left(\frac{x}{\sqrt{y^{2}+r^{2}}}\right)
+```
+
+In appearance, it is similar to (but distinct from) the interference pattern of 2 point sources.
+
+Here's a desmos plot of the putt wave to play around with: https://www.desmos.com/3d/yvy4xhqngx
 
 ## Build instructions
 Picoputt depends on SDL2 and GLEW.  I install them with vcpkg: `vcpkg install sdl2 glew`.
