@@ -75,7 +75,7 @@ The most obvious way we might think of to simulate this is to directly apply Eul
 
 ```python
 while True:
-  psi -= dt * 1j * H(psi)
+    psi -= dt * 1j * H(psi)
 ```
 
 Unfortunately, this method is unstable!  It will always blow up, no matter how small you choose `dt`.
@@ -85,14 +85,17 @@ We just need to perform staggered updates to the real and imaginary components o
 
 ```python
 while True:
-  real += dt * H(imag)
-  imag -= dt * H(real)
+    real += dt * H(imag)
+    imag -= dt * H(real)
 ```
 
 <details>
-<summary>Some notes on the stability of the Visscher algorithm (click for details)</summary>
+<summary>Stability of the Visscher algorithm (click for details)</summary>
 
-TODO: talk about stability, level shifts
+For $\hat{H} = \frac{\hat{p}^2}{2m}$ and grid spacing $\mathtt{dx}$, Visscher's algorithm is stable for $\mathtt{dt}\leq{}m\mathtt{dx}^2$.
+Stability is also affected by the choice of potential.
+For best results, you may need to level-shift your potential so that as much as possible is close to 0.
+See [^visscher1991] for more details and derivations.
 
 For a 2D grid, I found that a 9-point stencil is necessary for the Laplacian in order to reach the theoretical stability bounds
 (with a 5-point stencil, the stability region shrinks by a factor of 2).
@@ -105,7 +108,7 @@ A qturn is a single Euler step of the real component of the wavefunction followe
 
 ```python
 while True:
-  real, imag = -imag, real + dt * H(imag)
+    real, imag = -imag, real + dt * H(imag)
 ```
 
 Of course this is just a minor implementation detail, but I emphasize it because it affects the terminology I use.
@@ -155,11 +158,11 @@ So (except for certain quantized increments), if we attempt to rescale $\nabla{}
 and worse, the location of this discontinuity is not even well-defined!
 
 <details>
-<summary>Non-rotational nodes seem like they also *should* be a problem, even in 1-D: the phase gradient is infinite! (click)</summary>
+<summary>Non-rotational nodes *seem* like they also should be a problem, even in 1-D: the phase gradient is infinite! (click)</summary>
 
 But this isn't really a problem we need to worry about.  Instead, think of almost-nodes with very large phase gradients
 which jump easily (with a tiny perturbation) between positive and negative.  The "correct" behavior for true nodes in 1-D
-is probably to randomly choose $\pm\frac{\pi}{\rm dx}$, but in practice almost-nodes are the typical case, so whatever
+is probably to randomly choose $\pm\frac{\pi}{\mathtt{dx}}$, but in practice almost-nodes are the typical case, so whatever
 arbitrary choice we make for true nodes hardly matters.
 </details>
 </details>
