@@ -81,7 +81,7 @@ while True:
 Unfortunately, this method is unstable!  It will always blow up, no matter how small you choose `dt`.
 
 Thankfully, there is a small tweak we can do (described in Visscher 1991[^visscher1991]) which affords us a region of stability.  
-We just need perform staggered updates to the real and imaginary components of the wavefunction:
+We just need to perform staggered updates to the real and imaginary components of the wavefunction:
 
 ```python
 while True:
@@ -119,8 +119,8 @@ which could be run in one second on your machine (based on the average time take
 The code can be found in [qturn.frag](shaders/qturn.frag).
 
 ### Quantum drag force
-Energy dissipation is an essential feature of the game.  Picoputt uses a quantum analogue (which I call "phase drag")
-to the linear drag force $F=-bv$.
+Energy dissipation is an essential feature of the game.
+Picoputt uses something I call "phase drag", which is a quantum analogue to the linear drag force $F=-bv$.
 It is not the *only* way to get something that acts like a drag force,
 and certainly not the only way to get some kind of dissipative effect,
 but of the possibilities I considered, I believe it is the best.
@@ -165,8 +165,8 @@ arbitrary choice we make for true nodes hardly matters.
 </details>
 
 The simplest way to deal with this problem is to somewhat arbitrarily say that the drag force only acts on the irrotational component of the phase gradient.
-More formally, we can define $V_{drag}$ as a solution to $\nabla^2{}V_{drag} = b\nabla{}\cdot(\nabla{}\theta)$ satisfying appropriate boundary conditions
-(which are a bit messy since $\theta$ is undefined at the boundary).
+More formally, we can define $V_{drag}$ as a solution to the Poisson equation $\nabla^2{}V_{drag} = b\nabla{}\cdot(\nabla{}\theta)$
+satisfying appropriate boundary conditions (which are a bit messy since $\theta$ is undefined at the boundary).
 
 However, in picoputt, I do not actually solve this equation.  Instead, I use a fast and loose algorithm that mostly kinda works to approximate $V_{drag}$.
 See the section on [LIP integration](#lip-integration) for more details.
@@ -231,24 +231,21 @@ Intuitively, we should expect that the ground state of a good local approximatio
 approximation of the local minimum energy state.  And we can tell it works if when you put the particle into that state
 it stays put, even when subject to the drag force.
 
-I currently put a cosine potential well at the holes. Locally, we can approximate this as a harmonic oscillator,
+I currently place a cosine potential well at the holes.  Locally, we can approximate this as a harmonic oscillator,
 for which the ground state is a Gaussian.
 
 ### Putt wave
 When the player putts, we essentially want to apply some impulse $\Delta{}\vec{p}$ to the wavefunction.
-The simplest way to do this would be to multiply the wavefunction with the plane wave $e^{i\Delta{}\vec{p}\cdot\vec{x}}$.
-However, to give the player some more control, I wanted to limit the effect of the putt to some circular region.
+The simplest way to do this would be to multiply the wavefunction with the plane wave $\exp\left({i\Delta{}\vec{p}\cdot\vec{x}}\right)$.
+However, to give the player some more control, I wanted to limit the effect of the putt to some circular region of radius $r$.
 
-In other words I wanted some function $e^{-i\theta{}(\vec{x})}$, where inside a radius $r$, it is approximately a plane wave,
-and for $\left|\vec{x}\right|\gg{}r$, $\left|{\nabla{}\theta{}(\vec{x})}\right|\to0$ as quickly and as radially symmetrically as possible.
-
-To accomplish this, I chose (for $\Delta{}\vec{p}$ along $\hat{x}$):
+To accomplish this, I chose (for $\Delta{}\vec{p}$ along $\hat{x}$) the function:
 
 ```math
-\theta(x, y) = \Delta{}pr\arctan\left(\frac{x}{\sqrt{y^{2}+r^{2}}}\right)
+\exp\left({i\Delta{}pr\arctan\left(\frac{x}{\sqrt{y^{2}+r^{2}}}\right)}\right)
 ```
 
-In appearance, it is similar to (but distinct from) the interference pattern of 2 point sources.
+In appearance, the real component is similar to (but distinct from) the interference pattern of 2 point sources.
 
 Here's a desmos plot of the putt wave to play around with: https://www.desmos.com/3d/yvy4xhqngx
 
@@ -273,4 +270,4 @@ $ PICOPUTT_BASE_PATH=. ./builddir/picoputt
 You can also create a zip package with all necessary components using
 `cmake --build builddir -- package`
 
-[^visscher1991]: PB Visscher. A fast explicit algorithm for the time-dependent Schrödinger equation. https://doi.org/10.1063/1.168415. Computers in Physics, 5(6):596–598, 1991.
+[^visscher1991]: PB Visscher. A fast explicit algorithm for the time-dependent Schrödinger equation. Computers in Physics. https://doi.org/10.1063/1.168415. 1991.
