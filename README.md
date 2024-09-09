@@ -153,6 +153,15 @@ This occurs in the case of quantum vortices/eigenstates of angular momentum (mor
 In such cases, for $\Psi$ to be continuous, $\theta$ must have a $2\pi{}n$ discontinuity.
 So (except for certain quantized increments), if we attempt to rescale $\nabla{}\theta$, then $\Psi$ will inevitably get a discontinuity *somewhere*,
 and worse, the location of this discontinuity is not even well-defined!
+
+<details>
+<summary>Non-rotational nodes seem like they also *should* be a problem, even in 1-D: the phase gradient is infinite! (click)</summary>
+
+But this isn't really a problem we need to worry about.  Instead, think of almost-nodes with very large phase gradients
+which jump easily (with a tiny perturbation) between positive and negative.  The "correct" behavior for true nodes in 1-D
+is probably to randomly choose $\pm\frac{\pi}{\rm dx}$, but in practice almost-nodes are the typical case, so whatever
+arbitrary choice we make for true nodes hardly matters.
+</details>
 </details>
 
 The simplest way to deal with this problem is to somewhat arbitrarily say that the drag force only acts on the irrotational component of the phase gradient.
