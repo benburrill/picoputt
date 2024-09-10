@@ -145,7 +145,7 @@ with any constant $C$ (which contributes an unobservable global phase shift).
 </details>
 
 So, to verify that phase drag acts like linear drag on the expectation value of momentum, we can simply observe that when we
-rescale the phase gradient, $\left\langle{}p\right\rangle = \left\langle\alpha\nabla{}\theta_0\right\rangle = \alpha\left\langle{}p_0\right\rangle$.
+rescale the phase gradient, $\left\langle{}p\right\rangle = \left\langle\nabla{}\theta\right\rangle = \left\langle\alpha\nabla{}\theta_0\right\rangle = \alpha\left\langle{}p_0\right\rangle$.
 
 Another way to think about this is to define a drag potential $V_{drag} = b\theta{}(\vec{x})$, which we can add to the Hamiltonian.
 
@@ -176,14 +176,25 @@ satisfying appropriate boundary conditions (which are a bit messy since $\theta$
 However, in picoputt, I do not actually solve this equation.  Instead, I use a fast and loose algorithm that mostly kinda works to approximate $V_{drag}$.
 See the section on [LIP integration](#lip-integration) for more details.
 
+TODO: discuss some interesting properties of phase drag
+
 ### LIP integration
-The basic idea is pretty simple: since the problem with non-conservative fields is essentially that different path integrals between 2 points can produce different results,
+LIP integration is an unconventional (seemingly novel?)
+highly parallelizable non-iterative multi-scale method I designed for picoputt to determine the drag potential,
+but more generally it could be used to find a scalar potential for any vector field.
+It is exact (up to numerical error) in the case of a conservative field,
+and non-conservative features (in particular, point vortices of the kind that occur in phase gradients)
+have a reasonably small effect on the potential.
+
+The basic idea is pretty simple:
+since the problem with non-conservative fields is essentially that
+different path integrals between 2 points can produce different results,
 we'll do some sort of weighted average of a whole bunch of path integrals to smooth over any inconsistencies.
 
 The algorithm constructs a multi-scale line integral pyramid (the eponymous LIP), recursively using locally-averaged line integrals
 from the previous level to determine the line integrals between points twice as distant.
 At the top level of the pyramid, we have 4 line integrals, one for each edge of the rectangular grid,
-each one incorporating every discrete difference from the bottom level.
+each one (in some way) incorporating every vector in the field.
 
 From the top level of the pyramid, we can determine values of the scalar potential for the 4 corners of the grid.
 From there we fill in the interior points in a "bilinear-ish" way, descending the pyramid to get the relevant line integrals.
