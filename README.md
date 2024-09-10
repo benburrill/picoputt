@@ -89,6 +89,8 @@ while True:
     imag -= dt * H(real)
 ```
 
+(As with other staggered methods, you should treat `real` and `imag` as staggered in time by half a timestep).
+
 <details>
 <summary>Stability of the Visscher algorithm (click for details)</summary>
 
@@ -151,7 +153,7 @@ Another way to think about this is to define a drag potential $V_{drag} = b\thet
 <summary>Admittedly, by defining $\theta{}(\vec{x})$, I have concealed some mathematical ambiguities (click for the ugly truth).</summary>
 
 The complex logarithm is multivalued, so for any wavefunction, there are infinitely many $\theta{}(\vec{x})$ functions to choose from.
-Although we can unambiguously determine $\nabla{}\theta$ everywhere (ignoring nodes), it is not always possible for $\theta$ to be continuous if there are periodic boundary conditions.
+Although we can unambiguously determine $\nabla{}\theta$ everywhere (ignoring nodes), it is not always possible for $\theta$ to be continuous.
 This occurs in the case of quantum vortices/eigenstates of angular momentum (more concretely, think of $\nabla{}\theta$ pointing "tangentially along the orbit").
 In such cases, for $\Psi$ to be continuous, $\theta$ must have a $2\pi{}n$ discontinuity.
 So (except for certain quantized increments), if we attempt to rescale $\nabla{}\theta$, then $\Psi$ will inevitably get a discontinuity *somewhere*,
@@ -223,7 +225,7 @@ despite making basically no sense whatsoever.  It does not merit more explanatio
 but if you want to know how the sausage is made, see [the code](shaders/drag).
 
 ### Measurement
-TODO: explain what I'm doing, and what parts of it are weird
+TODO: explain what I'm doing, and what parts of it are weird/wrong.
 
 TODO: explain problem of discontinuities at walls - heat kernels as solution?
 
