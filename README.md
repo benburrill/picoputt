@@ -125,15 +125,18 @@ The code can be found in [qturn.frag](shaders/qturn.frag).
 
 ### Quantum drag force
 Energy dissipation is an essential feature of the game.
-Picoputt uses something I call "phase drag", which is a quantum analogue to the linear drag force $F=-bv$.
-It is not the *only* way to get something that acts like a drag force,
+Picoputt uses something I call "phase drag", which is a quantum analog to the linear drag force $F=-bv$.
+Phase drag is not the *only* way to construct a quantum analog to the drag force,
 and certainly not the only way to get some kind of dissipative effect,
 but of the possibilities I considered, I believe it is the best.
 
-The idea is to use the spatial phase gradient, $\nabla{}\theta(\vec{x})$ of a wavefunction
+The basic idea is to use the spatial phase gradient, $\nabla{}\theta(\vec{x})$ of a wavefunction
 $\Psi(\vec{x}) = r(\vec{x})e^{i\theta(\vec{x})}$ as a measure of local momentum for the drag force to act on.
-If in one time step $\Delta{}t$, linear drag would scale a particle's momentum by a factor of $\alpha=e^{-b{}\Delta{}t/m}$,
-then phase drag should likewise scale the phase gradient, transforming $\Psi$ to $r(\vec{x})e^{i(\alpha\theta(\vec{x}) + C)}$
+
+Considering only the effect of the drag force, if in one time step $\Delta{}t$,
+linear drag would scale a particle's momentum by a factor of $\alpha=e^{-b{}\Delta{}t/m}$,
+then phase drag should likewise scale the phase gradient everywhere,
+transforming $\Psi$ to $r(\vec{x})e^{i(\alpha\theta(\vec{x}) + C)}$
 with any constant $C$ (which contributes an unobservable global phase shift).
 
 <details>
