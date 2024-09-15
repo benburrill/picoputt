@@ -192,11 +192,11 @@ different path integrals between 2 points can produce different results,
 we'll do some sort of weighted average of a whole bunch of path integrals to smooth over any inconsistencies.
 
 The algorithm constructs a multi-scale line integral pyramid (the eponymous LIP), recursively using locally-averaged line integrals
-from the previous level to determine the line integrals between points twice as distant.
-At the top level of the pyramid, we have 4 line integrals, one for each edge of the rectangular grid,
+from the previous layer to determine the line integrals between points twice as distant.
+At the top layer of the pyramid, we have 4 line integrals, one for each edge of the rectangular grid,
 each one (in some way) incorporating every vector in the field.
 
-From the top level of the pyramid, we can determine values of the scalar potential for the 4 corners of the grid.
+From the top layer of the pyramid, we can determine values of the scalar potential for the 4 corners of the grid.
 From there we fill in the interior points in a "bilinear-ish" way, descending the pyramid to get the relevant line integrals.
 To illustrate better, here's an example of the order in which points get filled in:
 
@@ -217,15 +217,29 @@ So at least in theory, with sufficiently large grid sizes, on a GPU with suffici
 We just need to find a weighting scheme for nearby path integrals that produces acceptable results in our pyramid.
 
 The simplest case is the $2^k + 1$ grid sizes, as those can be perfectly subdivided.
-I found a good weighting scheme for these $2^k + 1$ grids quite quickly.
+I found a good weighting scheme for these $2^k + 1$ grids quite quickly:  
+![Diagram showing weighting scheme which works well for 2^k + 1 grids](https://github.com/user-attachments/assets/c764f3f0-a8aa-44c2-8300-016030ae53d5)
 
-TODO: explain with plots and diagrams, arctan(1/2)-arctan(1)/2 = arctan(1/2)-pi/8 = 0.0709 = ~2% of pi
+As illustrated in the diagram above, to determine the line integral of the next layer, we do a weighted average of up to 3 paths:
+the straight-line path
+(which is the sum of 2 line-integrals from the previous layer, or 1 vector from the field for the bottom layer of the pyramid)
+as well as 2 square "lobes" (or 1 lobe if we are at the edge of the grid).
+The lobes have weight $\frac{1}{4}$, and the straight-line path gets the remaining weight.
+Of course, each of the so-called "line-integrals" from the previous layer are themselves weighted averages of many paths.
 
+In the case of a complex point vortex (which has a non-conservative phase gradient, which we aim to eliminate), LIP-integration produces the following result:
+
+![Plot comparing the phase of a central complex point vortex with the LIP-integration of its phase gradient](https://github.com/user-attachments/assets/21dd0237-d8b8-40db-bf2e-88765f7eb206)
+
+This is a fairly good result.
+This central vortex leaves behind only a small artifact on the reconstructed scalar potential,
+with extremes of $\pm{}(\arctan(1/2)-\arctan(1)/2) \approx{} 0.0709$, or about 2% of $\pi{}$.
+The effect is also spread out in a fairly even and radially symmetric way.
 
 Encouraged by this early success (and hypnotized by the pretty fractal patterns),
 I set out on a futile and somewhat pointless quest to "correctly" generalize the algorithm for other grid sizes.
 
-Long story short, after an embarrassingly long time trying to generalize the algorithm
+Long story short, after an embarrassingly long time trying to generalize the algorithm in a sensible way
 (and trying to understand better what my algorithms were even doing mathematically),
 I had to throw in the towel as I was getting nowhere.
 Whenever I felt I had a promising idea, it was crap, but random nonsense tweaks sometimes improved things.
