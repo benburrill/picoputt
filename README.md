@@ -198,7 +198,7 @@ each one (in some way) incorporating every vector in the field.
 
 From the top layer of the pyramid, we can determine values of the scalar potential for the 4 corners of the grid.
 From there we fill in the interior points in a "bilinear-ish" way, descending the pyramid to get the relevant line integrals.
-To illustrate better, here's an example of the order in which points get filled in:
+To illustrate better, here's an example of the order in which points get filled in for a small grid:
 
 ```math
 \begin{matrix}
@@ -220,7 +220,7 @@ The simplest case is the $2^k + 1$ grid sizes, as those can be perfectly subdivi
 I found a good weighting scheme for these $2^k + 1$ grids quite quickly:  
 ![Diagram showing weighting scheme which works well for 2^k + 1 grids](https://github.com/user-attachments/assets/c764f3f0-a8aa-44c2-8300-016030ae53d5)
 
-As illustrated in the diagram above, to determine the line integral of the next layer, we do a weighted average of up to 3 paths:
+As illustrated in the diagram above, the line-integrals of the next layer are a weighted average of up to 3 paths:
 the straight-line path
 (which is the sum of 2 line-integrals from the previous layer, or 1 vector from the field for the bottom layer of the pyramid)
 as well as 2 square "lobes" (or 1 lobe if we are at the edge of the grid).
