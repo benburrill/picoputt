@@ -213,7 +213,7 @@ To illustrate better, here's an example of the order in which points get filled 
 \end{matrix}
 ```
 
-For a grid with $n$ points, from the skeleton of the algorithm I've laid out so far, the sequential time complexity is $O(n)$,
+From the skeleton of the algorithm I've laid out so far, for a grid with $n$ points, the sequential time complexity is $O(n)$,
 and when parallelized, there are $O(\log(n))$ stages (same as parallel prefix sum).
 By contrast, in a more conventional "full-multigrid" iterative relaxation algorithm
 (see for example Pritt 1996[^pritt1996]),
@@ -236,15 +236,17 @@ as well as 2 square "lobes" (or 1 lobe if we are at the edge of the grid).
 The lobes have weight $\frac{1}{4}$, and the straight-line path gets the remaining weight.
 Of course, each of the so-called "line-integrals" from the previous layer are themselves weighted averages of many paths.
 
-In the case of a complex point vortex (which has a non-conservative phase gradient, which we aim to eliminate),
-LIP-integration produces the following result:
+By virtue of path independence, no matter what weights we choose, the algorithm will be exact for any conservative field.
+
+In the case of a $2\pi$ complex point vortex (which has a non-conservative phase gradient, which we aim to eliminate),
+LIP-integration produces the following result (grid size is $513\times{}513$, results are similar for any square $2^k + 1$ grid):
 
 ![Plot comparing the phase of a central complex point vortex with the LIP-integration of its phase gradient](https://github.com/user-attachments/assets/21dd0237-d8b8-40db-bf2e-88765f7eb206)
 
 This is a fairly good result.
 This central vortex leaves behind only a small artifact on the reconstructed scalar potential,
 with extremes of $\pm{}(\arctan(1/2)-\arctan(1)/2) \approx{} \pm{}0.0709$, or about 2% of $\pi{}$.
-The effect is also spread out in a fairly even and radially symmetric way.
+The effect is also spread out in a fairly even and radially symmetric way with no sharp discontinuities.
 
 Encouraged by this early success (and hypnotized by the pretty fractal patterns),
 I set out on a futile and somewhat pointless quest to "correctly" generalize the algorithm for other grid sizes.
