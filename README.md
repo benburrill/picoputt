@@ -211,10 +211,16 @@ To illustrate better, here's an example of the order in which points get filled 
 ```
 
 For a grid with $n$ points, from the skeleton of the algorithm I've laid out so far, the sequential time complexity is $O(n)$,
-and when parallelized, there are $O(\log(n))$ stages.
-A "full-multigrid" iterative relaxation algorithm would also have $O(n)$ sequential time complexity, but would require $O(\log(n)^2)$ stages.
-So at least in theory, with sufficiently large grid sizes, on a GPU with sufficiently many cores, this algorithm should be faster.
-We just need to find a weighting scheme for nearby path integrals that produces acceptable results in our pyramid.
+and when parallelized, there are $O(\log(n))$ stages (same as parallel prefix sum).
+By contrast, in a more conventional "full-multigrid" iterative relaxation algorithm
+(see for example Pritt 1996[^pritt1996]),
+although each FMG cycle also has $O(n)$ sequential time complexity, when parallelized they require $O(\log(n)^2)$ stages.
+Many other alternatives (eg FFT-based approaches) also fall short in either sequential or parallel complexity.
+
+So at least in theory, with sufficiently large grid sizes, on a GPU with sufficiently many cores,
+our algorithm should be faster (at the cost of potentially undesirable results for non-conservative fields).
+We just need to find a weighting scheme of nearby path integrals in the pyramid that minimizes the amount of jankiness
+to a level undetectable by the player.
 
 The simplest case is the $2^k + 1$ grid sizes, as those can be perfectly subdivided.
 I found a good weighting scheme for these $2^k + 1$ grids quite quickly:  
@@ -227,13 +233,14 @@ as well as 2 square "lobes" (or 1 lobe if we are at the edge of the grid).
 The lobes have weight $\frac{1}{4}$, and the straight-line path gets the remaining weight.
 Of course, each of the so-called "line-integrals" from the previous layer are themselves weighted averages of many paths.
 
-In the case of a complex point vortex (which has a non-conservative phase gradient, which we aim to eliminate), LIP-integration produces the following result:
+In the case of a complex point vortex (which has a non-conservative phase gradient, which we aim to eliminate),
+LIP-integration produces the following result:
 
 ![Plot comparing the phase of a central complex point vortex with the LIP-integration of its phase gradient](https://github.com/user-attachments/assets/21dd0237-d8b8-40db-bf2e-88765f7eb206)
 
 This is a fairly good result.
 This central vortex leaves behind only a small artifact on the reconstructed scalar potential,
-with extremes of $\pm{}(\arctan(1/2)-\arctan(1)/2) \approx{} 0.0709$, or about 2% of $\pi{}$.
+with extremes of $\pm{}(\arctan(1/2)-\arctan(1)/2) \approx{} \pm{}0.0709$, or about 2% of $\pi{}$.
 The effect is also spread out in a fairly even and radially symmetric way.
 
 Encouraged by this early success (and hypnotized by the pretty fractal patterns),
@@ -301,3 +308,4 @@ You can also create a zip package with all necessary components using
 `cmake --build builddir -- package`
 
 [^visscher1991]: PB Visscher. A fast explicit algorithm for the time-dependent Schrödinger equation. Computers in Physics. https://doi.org/10.1063/1.168415. 1991.
+[^pritt1996]: MD Pritt. Phase Unwrapping by Means of Multigrid Techniques for Interferometric SAR. IEEE. https://doi.org/10.1109/36.499752. 1996
