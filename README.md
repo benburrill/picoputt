@@ -133,8 +133,8 @@ but of the possibilities I considered, I believe it is the best.
 The basic idea is to use the spatial phase gradient, $\nabla{}\theta(\vec{x})$ of a wavefunction
 $\Psi(\vec{x}) = r(\vec{x})e^{i\theta(\vec{x})}$ as a measure of local momentum for the drag force to act on.
 
-Considering only the effect of the drag force, if in one time step $\Delta{}t$,
-linear drag would scale a particle's momentum by a factor of $\alpha=e^{-b{}\Delta{}t/m}$,
+Considering only the effect of the drag force, in one time step $\Delta{}t$,
+if linear drag would scale a particle's momentum by a factor of $\alpha=e^{-b{}\Delta{}t/m}$,
 then phase drag should likewise scale the phase gradient everywhere,
 transforming $\Psi$ to $r(\vec{x})e^{i(\alpha\theta(\vec{x}) + C)}$
 with any constant $C$ (which contributes an unobservable global phase shift).
@@ -150,7 +150,7 @@ with any constant $C$ (which contributes an unobservable global phase shift).
 So, to verify that phase drag acts like linear drag on the expectation value of momentum, we can simply observe that when we
 rescale the phase gradient, $\left\langle{}p\right\rangle = \left\langle\nabla{}\theta\right\rangle = \left\langle\alpha\nabla{}\theta_0\right\rangle = \alpha\left\langle{}p_0\right\rangle$.
 
-Another way to think about this is to define a drag potential $V_{drag} = b\theta{}(\vec{x})$, which we can add to the Hamiltonian.
+Equivalently, we can define a drag potential $V_{drag} = \frac{b}{m}\theta{}(\vec{x})$, which can be added to the Hamiltonian.
 
 <details>
 <summary>Admittedly, by defining $\theta{}(\vec{x})$, I have concealed some mathematical ambiguities (click for the ugly truth).</summary>
