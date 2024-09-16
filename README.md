@@ -94,13 +94,13 @@ while True:
 <details>
 <summary>Stability of the Visscher algorithm (click for details)</summary>
 
-For $\hat{H} = \frac{\hat{p}^2}{2m}$ and grid spacing $\mathtt{dx}$, Visscher's algorithm is stable for $\mathtt{dt}\leq{}m\mathtt{dx}^2$.
-Stability is also affected by the choice of potential.
-For best results, you may need to level-shift your potential so that as much as possible is close to 0.
-See [^visscher1991] for more details and derivations.
-
-For a 2D grid, I found that a 9-point stencil is necessary for the Laplacian in order to reach the theoretical stability bounds
-(with a 5-point stencil, the stability region shrinks by a factor of 2).
+> For $\hat{H} = \frac{\hat{p}^2}{2m}$ and grid spacing $\mathtt{dx}$, Visscher's algorithm is stable for $\mathtt{dt}\leq{}m\mathtt{dx}^2$.
+> Stability is also affected by the choice of potential.
+> For best results, you may need to level-shift your potential so that as much as possible is close to 0.
+> See [^visscher1991] for more details and derivations.
+> 
+> For a 2D grid, I found that a 9-point stencil is necessary for the Laplacian in order to reach the theoretical stability bounds
+> (with a 5-point stencil, the stability region shrinks by a factor of 2).
 </details>
 
 To simplify writing the algorithm with a single shader to run on the GPU,
@@ -142,9 +142,9 @@ with any constant $C$ (which contributes an unobservable global phase shift).
 <details>
 <summary>The expectation value of momentum is equal to the expectation value of the spatial phase gradient (click for math).</summary>
 
-```math
-{\left\langle{}p_x\right\rangle} = \int_{-\infty}^{\infty} re^{-i\theta}\left(-i \frac{d}{dx}\right)re^{i\theta} dx = -i\int_{r_{-\infty}}^{r_{\infty}} r dr + \int_{-\infty}^{\infty} \frac{d\theta}{dx} {\left\lvert\Psi\right\rvert}^2 dx = 0 + \left\langle\frac{d\theta}{dx}\right\rangle
-```
+> ```math
+> {\left\langle{}p_x\right\rangle} = \int_{-\infty}^{\infty} re^{-i\theta}\left(-i \frac{d}{dx}\right)re^{i\theta} dx = -i\int_{r_{-\infty}}^{r_{\infty}} r dr + \int_{-\infty}^{\infty} \frac{d\theta}{dx} {\left\lvert\Psi\right\rvert}^2 dx = 0 + \left\langle\frac{d\theta}{dx}\right\rangle
+> ```
 </details>
 
 So, to verify that phase drag acts like linear drag on the expectation value of momentum, we can simply observe that when we
@@ -155,21 +155,21 @@ Equivalently, we can define a drag potential $V_{drag} = \frac{b}{m}\theta{}(\ve
 <details>
 <summary>Admittedly, by defining $\theta{}(\vec{x})$, I have concealed some mathematical ambiguities (click for the ugly truth).</summary>
 
-The complex logarithm is multivalued, so for any wavefunction, there are infinitely many $\theta{}(\vec{x})$ functions to choose from.
-Although we can unambiguously determine $\nabla{}\theta$ everywhere (ignoring nodes), it is not always possible for $\theta$ to be continuous.
-This occurs in the case of quantum vortices/eigenstates of angular momentum (more concretely, think of $\nabla{}\theta$ pointing "tangentially along the orbit").
-In such cases, for $\Psi$ to be continuous, $\theta$ must have a $2\pi{}n$ discontinuity.
-So (except for certain quantized increments), if we attempt to rescale $\nabla{}\theta$, then $\Psi$ will inevitably get a discontinuity *somewhere*,
-and worse, the location of this discontinuity is not even well-defined!
-
-<details>
-<summary>Non-rotational nodes *seem* like they also should be a problem, even in 1-D: the phase gradient is infinite! (click)</summary>
-
-But this isn't really a problem we need to worry about.  Instead, think of almost-nodes with very large phase gradients
-which jump easily (with a tiny perturbation) between positive and negative.  The "correct" behavior for true nodes in 1-D
-is probably to randomly choose $\pm\frac{\pi}{\mathtt{dx}}$, but in practice almost-nodes are the typical case, so whatever
-arbitrary choice we make for true nodes hardly matters.
-</details>
+> The complex logarithm is multivalued, so for any wavefunction, there are infinitely many $\theta{}(\vec{x})$ functions to choose from.
+> Although we can unambiguously determine $\nabla{}\theta$ everywhere (ignoring nodes), it is not always possible for $\theta$ to be continuous.
+> This occurs in the case of quantum vortices/eigenstates of angular momentum (more concretely, think of $\nabla{}\theta$ pointing "tangentially along the orbit").
+> In such cases, for $\Psi$ to be continuous, $\theta$ must have a $2\pi{}n$ discontinuity.
+> So (except for certain quantized increments), if we attempt to rescale $\nabla{}\theta$, then $\Psi$ will inevitably get a discontinuity *somewhere*,
+> and worse, the location of this discontinuity is not even well-defined!
+> 
+> <details>
+> <summary>Non-rotational nodes *seem* like they also should be a problem, even in 1-D: the phase gradient is infinite! (click)</summary>
+> 
+>> But this isn't really a problem we need to worry about.  Instead, think of almost-nodes with very large phase gradients
+>> which jump easily (with a tiny perturbation) between positive and negative.  The "correct" behavior for true nodes in 1-D
+>> is probably to randomly choose $\pm\frac{\pi}{\mathtt{dx}}$, but in practice almost-nodes are the typical case, so whatever
+>> arbitrary choice we make for true nodes hardly matters.
+> </details>
 </details>
 
 The simplest way to deal with the problem of vortices is to somewhat arbitrarily say that the drag force only acts on the irrotational component of the phase gradient.
