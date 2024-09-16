@@ -172,7 +172,7 @@ arbitrary choice we make for true nodes hardly matters.
 </details>
 </details>
 
-The simplest way to deal with this problem is to somewhat arbitrarily say that the drag force only acts on the irrotational component of the phase gradient.
+The simplest way to deal with the problem of vortices is to somewhat arbitrarily say that the drag force only acts on the irrotational component of the phase gradient.
 More formally, we can define $V_{drag}$ as a solution to the Poisson equation $\nabla^2{}V_{drag} = b\nabla{}\cdot(\nabla{}\theta)$
 satisfying appropriate boundary conditions (which are a bit messy since $\theta$ is undefined at the boundary).
 
