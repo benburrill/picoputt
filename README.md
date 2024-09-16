@@ -317,5 +317,5 @@ $ PICOPUTT_BASE_PATH=. ./builddir/picoputt
 You can also create a zip package with all necessary components using
 `cmake --build builddir -- package`
 
-[^visscher1991]: PB Visscher. A fast explicit algorithm for the time-dependent Schrödinger equation. Computers in Physics. https://doi.org/10.1063/1.168415. 1991.
-[^pritt1996]: MD Pritt. Phase Unwrapping by Means of Multigrid Techniques for Interferometric SAR. IEEE. https://doi.org/10.1109/36.499752. 1996
+[^visscher1991]: Visscher 1991. https://doi.org/10.1063/1.168415: A fast explicit algorithm for the time-dependent Schrödinger equation.
+[^pritt1996]: Pritt 1996. https://doi.org/10.1109/36.499752: Phase Unwrapping by Means of Multigrid Techniques for Interferometric SAR.
