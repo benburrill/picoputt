@@ -119,7 +119,8 @@ which I refer to as physics "turns" to distinguish them from timesteps.  So to b
 
 The drag force is also only updated once per turn.
 The "max perf" stat shown in-game is an estimate of the maximum number of turns (4 qturns + 1 drag update)
-which could be run in one second on your machine (based on the average time taken to run each turn).
+which could be run in one second on your machine if the simulation was sped up as fast as possible
+(based on the average time taken to run each turn).
 
 The code can be found in [qturn.frag](shaders/qturn.frag).
 
@@ -163,7 +164,7 @@ Equivalently, we can define a drag potential $V_{drag} = \frac{b}{m}\theta{}(\ve
 > and worse, the location of this discontinuity is not even well-defined!
 > 
 > <details>
-> <summary>Non-rotational nodes *seem* like they also should be a problem, even in 1-D: the phase gradient is infinite! (click)</summary>
+> <summary>Non-rotational nodes also *seem* problematic, even in 1-D: the phase gradient is infinite! (click)</summary>
 > 
 >> But this isn't really a problem we need to worry about.  Instead, think of almost-nodes with very large phase gradients
 >> which jump easily (with a tiny perturbation) between positive and negative.  The "correct" behavior for true nodes in 1-D
@@ -173,13 +174,15 @@ Equivalently, we can define a drag potential $V_{drag} = \frac{b}{m}\theta{}(\ve
 </details>
 
 The simplest way to deal with the problem of vortices is to somewhat arbitrarily say that the drag force only acts on the irrotational component of the phase gradient.
-More formally, we can define $V_{drag}$ as a solution to the Poisson equation $\nabla^2{}V_{drag} = b\nabla{}\cdot(\nabla{}\theta)$
+More formally, we can define $V_{drag}$ as a solution to the Poisson equation $\nabla^2{}V_{drag} = \frac{b}{m}\nabla{}\cdot(\nabla{}\theta)$
 satisfying appropriate boundary conditions (which are a bit messy since $\theta$ is undefined at the boundary).
 
 However, in picoputt, I do not actually solve this equation.  Instead, I use a fast and loose algorithm that mostly kinda works to approximate $V_{drag}$.
 See the section on [LIP integration](#lip-integration) for more details.
 
 TODO: discuss some interesting properties of phase drag
+
+TODO: maybe talk about alternative dissipative effects?
 
 ### LIP integration
 LIP integration is an unconventional (seemingly novel?)
@@ -215,14 +218,14 @@ To illustrate better, here's an example of the order in which points get filled 
 
 From the skeleton of the algorithm I've laid out so far, for a grid with $n$ points, the sequential time complexity is $O(n)$,
 and when parallelized, there are $O(\log(n))$ stages (same as parallel prefix sum).
-By contrast, in a more conventional "full-multigrid" iterative relaxation algorithm
+By comparison, in a more conventional "full-multigrid" iterative relaxation algorithm
 (see for example Pritt 1996[^pritt1996]),
-although each FMG cycle also has $O(n)$ sequential time complexity, when parallelized they require $O(\log(n)^2)$ stages.
+each FMG cycle also has $O(n)$ sequential time complexity, but when parallelized they require $O(\log(n)^2)$ stages.
 Many other alternatives (eg FFT-based approaches) also fall short in either sequential or parallel complexity.
 
 So at least in theory, with sufficiently large grid sizes, on a GPU with sufficiently many cores,
 our algorithm should be faster (at the cost of potentially undesirable results for non-conservative fields).
-We just need to find a weighting scheme of nearby path integrals in the pyramid that minimizes the amount of jankiness
+We just need to find a weighting scheme of nearby line integrals in the pyramid that minimizes the amount of jankiness
 to a level undetectable by the player.
 
 The simplest case is the $2^k + 1$ grid sizes, as those can be perfectly subdivided.
@@ -278,8 +281,10 @@ for which the ground state is a Gaussian.
 
 ### Putt wave
 When the player putts, we essentially want to apply some impulse $\Delta{}\vec{p}$ to the wavefunction.
-The simplest way to do this would be to multiply the wavefunction with the plane wave $\exp\left({i\Delta{}\vec{p}\cdot\vec{x}}\right)$.
-However, to give the player some more control, I wanted to limit the effect of the putt to some circular region of radius $r$.
+The simplest and most "correct" way to do this would be to multiply the wavefunction with the plane wave
+$\exp\left({i\Delta{}\vec{p}\cdot\vec{x}}\right)$.
+However, to give the player some more control,
+I wanted to constrain (most of) the effect of the putt to some circular region of radius $r$.
 
 To accomplish this, I chose (for $\Delta{}\vec{p}$ along $\hat{x}$) the function:
 
