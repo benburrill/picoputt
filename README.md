@@ -232,7 +232,7 @@ to a level undetectable by the player.
 
 The simplest case is the $2^k + 1$ grid sizes, as those can be perfectly subdivided.
 I found a good weighting scheme for these $2^k + 1$ grids quite quickly:  
-![Diagram showing weighting scheme which works well for 2^k + 1 grids](https://github.com/user-attachments/assets/c764f3f0-a8aa-44c2-8300-016030ae53d5)
+![Diagram showing weighting scheme which works well for 2^k + 1 grids](https://github.com/user-attachments/assets/9f800213-b7cd-4808-a1ec-b9d5096a81bf)
 
 As illustrated in the diagram above, the line-integrals of the next layer are a weighted average of up to 3 paths:
 the straight-line path
