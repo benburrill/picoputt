@@ -46,7 +46,7 @@ low-energy state.*
 However, you may find that rather than a round bump, you instead get "divots" in the ball's probability distribution
 which never go away and prevent you from winning.  These are **quantum vortices**: annoying little quantized bundles of
 angular momentum, which are not directly affected by the drag force.  If you're having trouble dealing with vortices,
-measurement can be useful tool to get rid of them.
+measurement can be a useful tool to get rid of them (a well-placed putt can often dislodge them as well).
 
 ![Image illustrating the appearance of a quantum vortex in comparison to the hole state](https://github.com/user-attachments/assets/7e0d6d4d-3661-44c7-84b8-be53e044b7ba)
 
@@ -146,14 +146,15 @@ with any constant $C$ (which contributes an unobservable global phase shift).
 <summary>The expectation value of momentum is equal to the expectation value of the spatial phase gradient (click for math).</summary>
 
 > ```math
-> {\left\langle{}p_x\right\rangle} = \int_{-\infty}^{\infty} re^{-i\theta}\left(-i \frac{d}{dx}\right)re^{i\theta} dx = -i\int_{r_{-\infty}}^{r_{\infty}} r dr + \int_{-\infty}^{\infty} \frac{d\theta}{dx} {\left\lvert\Psi\right\rvert}^2 dx = 0 + \left\langle\frac{d\theta}{dx}\right\rangle
+> {\left\langle{}\hat{p_x}\right\rangle} = \int_{-\infty}^{\infty} re^{-i\theta}\left(-i \frac{d}{dx}\right)re^{i\theta} dx = -i\int_{r_{-\infty}}^{r_{\infty}} r dr + \int_{-\infty}^{\infty} \frac{d\theta}{dx} {\left\lvert\Psi\right\rvert}^2 dx = 0 + \left\langle\frac{d\theta}{dx}\right\rangle
 > ```
 </details>
 
 So, to verify that phase drag acts like linear drag on the expectation value of momentum, we can simply observe that when we
-rescale the phase gradient, $\left\langle{}p\right\rangle = \left\langle\nabla{}\theta\right\rangle = \left\langle\alpha\nabla{}\theta_0\right\rangle = \alpha\left\langle{}p_0\right\rangle$.
+rescale the phase gradient, $\left\langle{}\hat{p}\right\rangle = \left\langle\nabla{}\theta\right\rangle = \left\langle\alpha\nabla{}\theta_0\right\rangle = \alpha\left\langle{}\hat{p_0}\right\rangle$.
 
 Equivalently, we can define a drag potential $V_{drag} = \frac{b}{m}\theta{}(\vec{x})$, which can be added to the Hamiltonian.
+It is nice to notice from this that ${F} = {-\nabla{}V} = {-b\frac{\nabla{}\theta}{m}} \cong{} {-bv}$.
 
 <details>
 <summary>Admittedly, by defining $\theta{}(\vec{x})$, I have concealed some mathematical ambiguities (click for the ugly truth).</summary>
