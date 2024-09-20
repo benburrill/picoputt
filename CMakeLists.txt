@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.27)
-project(picoputt VERSION 0.1.0
+cmake_minimum_required(VERSION 3.13)
+project(picoputt VERSION 0.1.1
     LANGUAGES C
     DESCRIPTION "Quantum miniature golf game"
     HOMEPAGE_URL "https://github.com/benburrill/picoputt"
