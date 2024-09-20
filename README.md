@@ -7,7 +7,9 @@ Features:
 * Putting: hit the quantum golf-ball around using a golf club "putt-wave" with adjustable radius.
 * Simultaneous partial measurement of position and momentum.
 * Play golf, not dice: Although the randomness of measurement can be helpful, you can win with putting alone (which is not random).
-* Fancy pseudo-3D graphics
+* Fancy pseudo-3D graphics:
+
+https://github.com/user-attachments/assets/7185b1c8-c890-492e-a4c9-9bb2807fa659
 
 
 ## Obtaining picoputt
