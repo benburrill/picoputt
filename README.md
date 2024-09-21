@@ -108,7 +108,7 @@ while True:
 To simplify writing the algorithm with a single shader to run on the GPU,
 I actually implement the Visscher algorithm slightly differently from this, using what I call a "qturn" (short for quarter turn).
 A qturn is a single Euler step of the real component of the wavefunction followed by a complex rotation of 90 degrees.
-4 qturns is exactly equivalent to 2 iterations of the Visscher algorithm, so we can simply iteratively apply qturns to update the wavefunction, ie:
+4 qturns is exactly equivalent to 2 iterations of the Visscher algorithm, so we can simply iteratively apply qturns to update the wavefunction:
 
 ```python
 while True:
@@ -280,7 +280,8 @@ approximation of the local minimum energy state.  And we can tell it works if wh
 it stays put, even when subject to the drag force.
 
 I currently place a cosine potential well at the holes.  Locally, we can approximate this as a harmonic oscillator,
-for which the ground state is a Gaussian.
+for which the ground state is a Gaussian.  So our approximate "local minimum energy state" is just a Gaussian centered
+at the location of the hole.
 
 ### Putt wave
 When the player putts, we essentially want to apply some impulse $\Delta{}\vec{p}$ to the wavefunction.
@@ -309,9 +310,9 @@ $ cmake --build .
 $ ./picoputt
 ```
 
-By default, picoputt looks for resources in its parent directory.  If you want to use a different build directory, since
-these files are not copied over to the build directory, you may want to override the base directory using the
-`$PICOPUTT_BASE_PATH` environment variable:
+If you want to use a build directory other than `.`, be aware that (by default) picoputt loads resources from the parent
+directory of the executable file.  These files are not copied over to the build directory, so it may be most convenient
+to override the base directory using the `$PICOPUTT_BASE_PATH` environment variable:
 ```shell
 $ cmake --build builddir
 $ PICOPUTT_BASE_PATH=. ./builddir/picoputt
