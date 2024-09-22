@@ -80,6 +80,9 @@ while True:
     psi -= dt * 1j * H(psi)
 ```
 
+(In this Python code, `psi` would be a complex-valued numpy array, and assuming you're working in position space,
+`H` will need to compute a second derivative/Laplacian).
+
 Unfortunately, this method is unstable!  It will always blow up, no matter how small you choose `dt`.
 
 Thankfully, there is a small tweak we can do (described in Visscher 1991[^visscher1991]) which affords us a region of stability.  
