@@ -13,7 +13,7 @@ https://github.com/user-attachments/assets/7185b1c8-c890-492e-a4c9-9bb2807fa659
 
 
 ## Obtaining picoputt
-You can download releases of picoputt for Windows or Linux [here](https://github.com/benburrill/picoputt/releases).  
+You can download the latest metastable release of picoputt for Windows or Linux [here](https://github.com/benburrill/picoputt/releases/latest).  
 MacOS is sadly **not supported** (because picoputt requires OpenGL 4.3 for compute shaders).
 
 If you wish to compile picoputt from source, see the [build instructions](#build-instructions) below.
