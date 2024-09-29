@@ -66,7 +66,7 @@ If you need an extra challenge, here are some things you can try:
 Note: I use units of $\hbar = 1$, so if the units don't make sense, hopefully it's because of that and not because I'm a klutz.
 
 ### Quantum simulation
-The time-dependent Schrödinger equation, which describes the evolution of a quantum particle, can be written as
+The time-dependent Schrödinger equation, which describes the evolution of quantum particles, can be written as
 
 ```math
 \frac{d{}\Psi}{dt} = -i\hat{H}{}\Psi
@@ -271,20 +271,75 @@ despite making basically no sense whatsoever.  It does not merit more explanatio
 but if you want to know how the sausage is made, see [the code](shaders/drag).
 
 ### Measurement
-TODO: explain what I'm doing, and what parts of it are weird/wrong.
+TODO: briefly introduce the concept of a quantum measurement?
 
-TODO: explain problem of discontinuities at walls - heat kernels as solution?
+With picoputt's "measurements", we're not actually interested in measuring anything at all.  We just want to use the
+phenomenon of collapse basically as an excuse to reset the wavefunction back into some nice, simple, well-localized
+state.  It makes sense then to measure position, as the eigenstates of the position operator are certainly **very**
+well-localized, actually way *too* localized!  To have a physically sensible post-measurement state, a measurement of
+position needs to have some uncertainty.  We can get this uncertainty by simultaneously measuring position and momentum.
 
-### Winning
+For a simultaneous measurement of position and momentum, our theoretical measurement device will have an extra inherent 
+uncertainty $\sigma_x$ to the positions it reports, and will correspondingly have the minimum possible uncertainty in
+momentum $\sigma_p$ allowed by the uncertainty relation between position and momentum, $\sigma_x\sigma_p = \frac{1}{2}$.
+
+Immediately after performing the simultaneous measurement, it's fairly reasonable to want the property that if we were
+to then perform an idealized exact measurement of position, it should statistically agree with the results of the
+previous simultaneous measurement (even though it may not match exactly).  And likewise for momentum, if we instead were
+to choose to immediately do an idealized momentum measurement.  To achieve this, we can make the measurement basis set
+consist entirely of minimum uncertainty Gaussian wavepackets that have standard deviations (of their positional PDFs)
+equal to $\sigma_x$.
+
+So our post-measurement state should be one of these Gaussian wavepackets, with central position and momentum sampled
+from the space of possible parameters (since picoputt is 2D, this space is 4D, as there are 2 degrees of freedom each
+for the central position and momentum), with probabilities obtained projectively as with other measurements.  This is an
+overcomplete basis, but we can renormalize so the probabilities add up to 1.
+
+For a (somewhat) more rigorous approach to this description of simultaneous measurements, see Arthurs and Kelly
+1965[^arthurskelly1965], who couple the system in a particular way to a measurement device consisting of a pair of
+"meters" (one for position and one for momentum) which act like little quantum dials to show the results of the
+measurement.  The meter positions can later be measured (with ideal measurements) to get the values of the
+simultaneously measured position and momentum.  The post-measurement state of the measured system is a Gaussian
+wavepacket just as described previously.  Their "balance" $b=2\sigma_x^2$.
+
+With all that said, picoputt doesn't actually do any of this!  We're completely faking it!
+
+Instead, we get the measured position with an ideal position measurement, use the phase gradient at that position as the
+measured momentum, and plop down a Gaussian wavepacket with those parameters.  Doing an ideal position measurement to
+get the position is probably forgivable as an approximation, but using the phase gradient is nonsense here.  However,
+qualitatively it has the result of preserving some of the correlations between position and momentum that would be
+evident in the simultaneous measurement, even though the distribution is way off.  Since it's random though, we have
+some plausible deniability -- the player is unlikely to do a statistical analysis, so they probably won't notice we're
+pulling a fast one on them.
+
+There is however a much more noticeable problem with the current implementation.  The Gaussian wavepackets we've been
+talking about are sensible to use as post-measurement states in free space, but they do not satisfy the boundary
+conditions imposed by the walls.  This is noticeable when the golf ball is measured near a wall, which results in an
+"explosion" of probability that you have likely already seen if you've played picoputt a few times.  This is due to the
+sharp discontinuity in the wavefunction that is created at the boundary with the wall, because the wavefunction is
+forced to 0 inside the wall (it is an infinite barrier).
+
+If we want to eliminate this discontinuity, while still having the post-measurement state be Gaussian far away from the
+wall, probably the most sensible option would be to solve for a heat kernel with boundary conditions imposed by the
+wall, and use that heat kernel in place of a Gaussian.
+
+In deriving a Gaussian post-measurement state, Arthurs and Kelly assume that the interaction strength of the measurement
+is large enough that *all* other terms in the Hamiltonian can be ignored.  But since the walls represent an infinite
+potential, it makes sense that we cannot ignore them.  I am not sure (because I have not yet attempted to do the math)
+if generalizing the work of Arthurs and Kelly to add the Dirichlet boundary conditions would produce heat kernel
+wavepackets of some kind, but heat kernels definitely seem like a likely suspect.  For now though, fixing the "explosion"
+issue is a pretty low priority.  It is certainly noticeable and kinda ugly, but it's not particularly detrimental.
+
+### Probably winning
 The winning "hole state" is supposed to be the local minimum energy state.  So what do I actually mean by that?  
 Honestly, I'm not sure exactly.  But no matter: approximate understanding ought to be good enough for an approximation.
 Intuitively, we should expect that the ground state of a good local approximation of the Hamiltonian will be a good
 approximation of the local minimum energy state.  And we can tell it works if when you put the particle into that state
-it stays put, even when subject to the drag force.
+it remains stationary, even when subject to the drag force.
 
-I currently place a cosine potential well at the holes.  Locally, we can approximate this as a harmonic oscillator,
-for which the ground state is a Gaussian.  So our approximate "local minimum energy state" is just a Gaussian centered
-at the location of the hole.
+I currently place a cosine potential well at the holes.  But locally, we may as well approximate further and treat it as
+a harmonic oscillator, for which the ground state is a Gaussian.  So our approximate "local minimum energy state" is
+just a Gaussian centered at the location of the hole.
 
 ### Putt wave
 When the player putts, we essentially want to apply some impulse $\Delta{}\vec{p}$ to the wavefunction.
@@ -326,3 +381,4 @@ You can also create a zip package with all necessary components using
 
 [^visscher1991]: Visscher 1991. https://doi.org/10.1063/1.168415: A fast explicit algorithm for the time-dependent Schrödinger equation.
 [^pritt1996]: Pritt 1996. https://doi.org/10.1109/36.499752: Phase Unwrapping by Means of Multigrid Techniques for Interferometric SAR.
+[^arthurskelly1965]: Arthurs and Kelly 1965. https://doi.org/10.1002/j.1538-7305.1965.tb01684.x: On the Simultaneous Measurement of a Pair of Conjugate Observables
