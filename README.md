@@ -260,11 +260,10 @@ The effect is also spread out in a fairly even and radially symmetric way with n
 Encouraged by this early success (and hypnotized by the pretty fractal patterns),
 I set out on a futile and somewhat pointless quest to "correctly" generalize the algorithm for other grid sizes.
 
-Long story short, after an embarrassingly long time trying to generalize the algorithm in a sensible way
-(and trying to understand better what my algorithms were even doing mathematically),
-I had to throw in the towel as I was getting nowhere.
-Whenever I felt I had a promising idea, it was crap, but random nonsense tweaks sometimes improved things.
-However, despite being riddled with undesirable properties, most of my attempts seemed to be good enough for the purpose of the game at least.
+Long story short, I failed.  After far too long trying to generalize the algorithm in a sensible way
+(and ineptly trying to understand better what my algorithms were even doing mathematically),
+I finally gave up as I was getting nowhere.  All my attempts have some undesirable properties for certain grid sizes
+(such as discontinuities in the final rows/columns), but they seem fine for the purpose of the game at least.
 
 The generalization picoputt uses I picked because it's relatively easy to implement and seems to give decent results for many grid sizes,
 despite making basically no sense whatsoever.  It does not merit more explanation here,
