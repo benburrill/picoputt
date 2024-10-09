@@ -255,7 +255,7 @@ LIP-integration produces the following result (grid size is ${513\times{}513}$, 
 This is a fairly good result.
 This central vortex leaves behind only a small artifact on the reconstructed scalar potential,
 with extremes of ${{\pm{}(\arctan(1/2)-\arctan(1)/2)} \approx{} {\pm{}0.0709}}$, or about 2% of ${\pi{}}$.
-The effect is also spread out in a fairly even and radially symmetric way with no sharp discontinuities.
+The effect is also spread out in a fairly even and rotationally symmetric way with no sharp discontinuities.
 
 Encouraged by this early success (and hypnotized by the pretty fractal patterns),
 I set out on a futile and somewhat pointless quest to "correctly" generalize the algorithm for other grid sizes.
