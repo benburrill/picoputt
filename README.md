@@ -36,7 +36,7 @@ Measurement also adds to your score, but it only adds 1/2.
 
 To win, you need at least **50% probability** of finding the particle in the **local minimum energy state at the goal hole.**
 The hole itself is a potential well which will attract the particle.  The local minimum energy state is referred to as
-the "hole state" $\left\lvert{\rm hole}\right\rangle$ and the current probability is displayed in game as $P({\rm win})$.
+the "hole state" ${\left\lvert{\rm hole}\right\rangle}$ and the current probability is displayed in game as ${P({\rm win})}$.
 
 The location of **the goal hole is indicated with a green arrow**.  When the ball is in the hole state, its probability
 distribution will look like a **stationary round bump** centered at this location.  
@@ -63,16 +63,16 @@ If you need an extra challenge, here are some things you can try:
 
 
 ## Technical details
-Note: I use units of $\hbar = 1$, so if the units don't make sense, hopefully it's because of that and not because I'm a klutz.
+Note: I use units of ${{\hbar} = {1}}$, so if the units don't make sense, hopefully it's because of that and not because I'm a klutz.
 
 ### Quantum simulation
 The time-dependent Schrödinger equation, which describes the evolution of quantum particles, can be written as
 
 ```math
-\frac{d{}\Psi}{dt} = -i\hat{H}{}\Psi
+{\frac{d{}\Psi}{dt}} = {-i\hat{H{}}\Psi}
 ```
 
-Where $\Psi$ is the wavefunction and $\hat{H}$ is the linear Hamiltonian operator describing the system.  
+Where ${\Psi}$ is the wavefunction and ${\hat{H}}$ is the linear Hamiltonian operator describing the system.  
 The most obvious way we might think of to simulate this is to directly apply Euler's method:
 
 ```python
@@ -99,7 +99,7 @@ while True:
 <details>
 <summary>Stability of the Visscher algorithm (click for details)</summary>
 
-> For $\hat{H} = \frac{\hat{p}^2}{2m}$ and grid spacing $\mathtt{dx}$, Visscher's algorithm is stable for $\mathtt{dt}\leq{}m\mathtt{dx}^2$.
+> For ${{\hat{H}} = {\frac{\hat{p}^2}{2m}}}$ and grid spacing ${\mathtt{dx}}$, Visscher's algorithm is stable for ${\mathtt{dt}\leq{}m\mathtt{dx}^2}$.
 > Stability is also affected by the choice of potential.
 > For best results, you may need to level-shift your potential so that as much as possible is close to 0.
 > See [^visscher1991] for more details and derivations.
@@ -131,42 +131,42 @@ The code can be found in [qturn.frag](shaders/qturn.frag).
 
 ### Quantum drag force
 Energy dissipation is an essential feature of the game.
-Picoputt uses something I call "phase drag", which is a quantum analog to the linear drag force $F=-bv$.
+Picoputt uses something I call "phase drag", which is a quantum analog to the linear drag force ${{F} = {-bv}}$.
 Phase drag is not the *only* way to construct a quantum analog to the drag force,
 and certainly not the only way to get some kind of dissipative effect,
 but of the possibilities I considered, I believe it is the best.
 
-The basic idea is to use the spatial phase gradient, $\nabla{}\theta(\vec{x})$ of a wavefunction
-$\Psi(\vec{x}) = r(\vec{x})e^{i\theta(\vec{x})}$ as a measure of local momentum for the drag force to act on.
+The basic idea is to use the spatial phase gradient, ${\nabla{}\theta(\vec{x})}$ of a wavefunction
+${{\Psi(\vec{x})} = {r(\vec{x})e^{i\theta(\vec{x})}}}$ as a measure of local momentum for the drag force to act on.
 
-Considering only the effect of the drag force, in one time step $\Delta{}t$,
-if linear drag would scale a particle's momentum by a factor of $\alpha=e^{-b{}\Delta{}t/m}$,
+Considering only the effect of the drag force, in one time step ${\Delta{}t}$,
+if linear drag would scale a particle's momentum by a factor of ${{\alpha} = {e^{-b{}\Delta{}t/m}}}$,
 then phase drag should likewise scale the phase gradient everywhere,
-transforming $\Psi$ to $r(\vec{x})e^{i(\alpha\theta(\vec{x}) + C)}$
-with any constant $C$ (which contributes an unobservable global phase shift).
+transforming ${\Psi}$ to ${r(\vec{x})e^{i(\alpha\theta(\vec{x}) + C)}}$
+with any constant ${C}$ (which contributes an unobservable global phase shift).
 
 <details>
 <summary>The expectation value of momentum is equal to the expectation value of the spatial phase gradient (click for math).</summary>
 
 > ```math
-> {\left\langle{}\hat{p_x}\right\rangle} = \int_{-\infty}^{\infty} re^{-i\theta}\left(-i \frac{d}{dx}\right)re^{i\theta} dx = -i\int_{r_{-\infty}}^{r_{\infty}} r dr + \int_{-\infty}^{\infty} \frac{d\theta}{dx} {\left\lvert\Psi\right\rvert}^2 dx = 0 + \left\langle\frac{d\theta}{dx}\right\rangle
+> {\left\langle{}\hat{p}_x\right\rangle} = \int_{-\infty}^{\infty} re^{-i\theta}\left(-i \frac{d}{dx}\right)re^{i\theta} dx = -i\int_{r_{-\infty}}^{r_{\infty}} r dr + \int_{-\infty}^{\infty} \frac{d\theta}{dx} {\left\lvert\Psi\right\rvert}^2 dx = 0 + \left\langle\frac{d\theta}{dx}\right\rangle
 > ```
 </details>
 
 So, to verify that phase drag acts like linear drag on the expectation value of momentum, we can simply observe that when we
-rescale the phase gradient, $\left\langle{}\hat{p}\right\rangle = \left\langle\nabla{}\theta\right\rangle = \left\langle\alpha\nabla{}\theta_0\right\rangle = \alpha\left\langle{}\hat{p_0}\right\rangle$.
+rescale the phase gradient, ${{\left\langle{}{\hat{p}}\right\rangle} = {\left\langle{}{\nabla{}\theta}\right\rangle} = {\left\langle{}{\alpha\nabla{}\theta_0}\right\rangle} = {\alpha\left\langle{}{\hat{p}_0}\right\rangle}}$.
 
-Equivalently, we can define a drag potential $V_{drag} = \frac{b}{m}\theta{}(\vec{x})$, which can be added to the Hamiltonian.
-It is nice to notice from this that ${F} = {-\nabla{}V} = {-b\frac{\nabla{}\theta}{m}} \cong{} {-bv}$.
+Equivalently, we can define a drag potential ${{V_{drag}} = {\frac{b}{m}\theta{}(\vec{x})}}$, which can be added to the Hamiltonian.
+It is nice to notice from this that ${{F} = {-\nabla{}V} = {-b\frac{\nabla{}\theta}{m}} \cong{} {-bv}}$.
 
 <details>
-<summary>Admittedly, by defining $\theta{}(\vec{x})$, I have concealed some mathematical ambiguities (click for the ugly truth).</summary>
+<summary>Admittedly, by defining ${\theta{}(\vec{x})}$, I have concealed some mathematical ambiguities (click for the ugly truth).</summary>
 
-> The complex logarithm is multivalued, so for any wavefunction, there are infinitely many $\theta{}(\vec{x})$ functions to choose from.
-> Although we can unambiguously determine $\nabla{}\theta$ everywhere (ignoring nodes), it is not always possible for $\theta$ to be continuous.
-> This occurs in the case of quantum vortices/eigenstates of angular momentum (more concretely, think of $\nabla{}\theta$ pointing "tangentially along the orbit").
-> In such cases, for $\Psi$ to be continuous, $\theta$ must have a $2\pi{}n$ discontinuity.
-> So (except for certain quantized increments), if we attempt to rescale $\nabla{}\theta$, then $\Psi$ will inevitably get a discontinuity *somewhere*,
+> The complex logarithm is multivalued, so for any wavefunction, there are infinitely many ${\theta{}(\vec{x})}$ functions to choose from.
+> Although we can unambiguously determine ${\nabla{}\theta}$ everywhere (ignoring nodes), it is not always possible for ${\theta}$ to be continuous.
+> This occurs in the case of quantum vortices/eigenstates of angular momentum (more concretely, think of ${\nabla{}\theta}$ pointing "tangentially along the orbit").
+> In such cases, for ${\Psi}$ to be continuous, ${\theta}$ must have a ${2\pi{}n}$ discontinuity.
+> So (except for certain quantized increments), if we attempt to rescale ${\nabla{}\theta}$, then ${\Psi}$ will inevitably get a discontinuity *somewhere*,
 > and worse, the location of this discontinuity is not even well-defined!
 > 
 > <details>
@@ -174,16 +174,16 @@ It is nice to notice from this that ${F} = {-\nabla{}V} = {-b\frac{\nabla{}\thet
 > 
 >> But this isn't really a problem we need to worry about.  Instead, think of almost-nodes with very large phase gradients
 >> which jump easily (with a tiny perturbation) between positive and negative.  The "correct" behavior for true nodes in 1-D
->> is probably to randomly choose $\pm\frac{\pi}{\mathtt{dx}}$, but in practice almost-nodes are the typical case, so whatever
+>> is probably to randomly choose ${\pm\frac{\pi}{\mathtt{dx}}}$, but in practice almost-nodes are the typical case, so whatever
 >> arbitrary choice we make for true nodes hardly matters.
 > </details>
 </details>
 
 The simplest way to deal with the problem of vortices is to somewhat arbitrarily say that the drag force only acts on the irrotational component of the phase gradient.
-More formally, we can define $V_{drag}$ as a solution to the Poisson equation $\nabla^2{}V_{drag} = \frac{b}{m}\nabla{}\cdot(\nabla{}\theta)$
-satisfying appropriate boundary conditions (which are a bit messy since $\theta$ is undefined at the boundary).
+More formally, we can define ${V_{drag}}$ as a solution to the Poisson equation ${{\nabla^2{}V_{drag}} = {\frac{b}{m}\nabla{}\cdot(\nabla{}\theta)}}$
+satisfying appropriate boundary conditions (which are a bit messy since ${\theta}$ is undefined at the boundary).
 
-However, in picoputt, I do not actually solve this equation.  Instead, I use a fast and loose algorithm that mostly kinda works to approximate $V_{drag}$.
+However, in picoputt, I do not actually solve this equation.  Instead, I use a fast and loose algorithm that mostly kinda works to approximate ${V_{drag}}$.
 See the section on [LIP integration](#lip-integration) for more details.
 
 TODO: discuss some interesting properties of phase drag
@@ -222,11 +222,11 @@ To illustrate better, here's an example of the order in which points get filled 
 \end{matrix}
 ```
 
-From the skeleton of the algorithm I've laid out so far, for a grid with $n$ points, the sequential time complexity is $O(n)$,
-and when parallelized, there are $O(\log(n))$ stages (same as parallel prefix sum).
+From the skeleton of the algorithm I've laid out so far, for a grid with ${n}$ points, the sequential time complexity is ${O\left({n}\right)}$,
+and when parallelized, there are ${O\left({\log(n)}\right)}$ stages (same as parallel prefix sum).
 By comparison, in a more conventional "full-multigrid" iterative relaxation algorithm
 (see for example Pritt 1996[^pritt1996]),
-each FMG cycle also has $O(n)$ sequential time complexity, but when parallelized they require $O(\log(n)^2)$ stages.
+each FMG cycle also has ${O\left({n}\right)}$ sequential time complexity, but when parallelized they require ${O\left({\log(n)^2}\right)}$ stages.
 Many other alternatives (eg FFT-based approaches) also fall short in either sequential or parallel complexity.
 
 So at least in theory, with sufficiently large grid sizes, on a GPU with sufficiently many cores,
@@ -234,27 +234,27 @@ our algorithm should be faster (at the cost of potentially undesirable results f
 We just need to find a weighting scheme of nearby line integrals in the pyramid that minimizes the amount of jankiness
 to a level undetectable by the player.
 
-The simplest case is the $2^k + 1$ grid sizes, as those can be perfectly subdivided.
-I found a good weighting scheme for these $2^k + 1$ grids quite quickly:  
+The simplest case is the ${2^k + 1}$ grid sizes, as those can be perfectly subdivided.
+I found a good weighting scheme for these ${2^k + 1}$ grids quite quickly:  
 ![Diagram showing weighting scheme which works well for 2^k + 1 grids](https://github.com/user-attachments/assets/9f800213-b7cd-4808-a1ec-b9d5096a81bf)
 
 As illustrated in the diagram above, the line-integrals of the next layer are a weighted average of up to 3 paths:
 the straight-line path
 (which is the sum of 2 line-integrals from the previous layer, or 1 vector from the field for the bottom layer of the pyramid)
 as well as 2 square "lobes" (or 1 lobe if we are at the edge of the grid).
-The lobes have weight $\frac{1}{4}$, and the straight-line path gets the remaining weight.
+The lobes have weight ${\frac{1}{4}}$, and the straight-line path gets the remaining weight.
 Of course, each of the so-called "line-integrals" from the previous layer are themselves weighted averages of many paths.
 
 By virtue of path independence, no matter what weights we choose, the algorithm will be exact for any conservative field.
 
-In the case of a $2\pi$ complex point vortex (which has a non-conservative phase gradient, which we aim to eliminate),
-LIP-integration produces the following result (grid size is $513\times{}513$, results are similar for any square $2^k + 1$ grid):
+In the case of a ${2\pi}$ complex point vortex (which has a non-conservative phase gradient, which we aim to eliminate),
+LIP-integration produces the following result (grid size is ${513\times{}513}$, results are similar for any square ${2^k + 1}$ grid):
 
 ![Plot comparing the phase of a central complex point vortex with the LIP-integration of its phase gradient](https://github.com/user-attachments/assets/21dd0237-d8b8-40db-bf2e-88765f7eb206)
 
 This is a fairly good result.
 This central vortex leaves behind only a small artifact on the reconstructed scalar potential,
-with extremes of $\pm{}(\arctan(1/2)-\arctan(1)/2) \approx{} \pm{}0.0709$, or about 2% of $\pi{}$.
+with extremes of ${{\pm{}(\arctan(1/2)-\arctan(1)/2)} \approx{} {\pm{}0.0709}}$, or about 2% of ${\pi{}}$.
 The effect is also spread out in a fairly even and radially symmetric way with no sharp discontinuities.
 
 Encouraged by this early success (and hypnotized by the pretty fractal patterns),
@@ -279,15 +279,15 @@ well-localized, actually way *too* localized!  To have a physically sensible pos
 position needs to have some uncertainty.  We can get this uncertainty by simultaneously measuring position and momentum.
 
 For a simultaneous measurement of position and momentum, our theoretical measurement device will have an extra inherent 
-uncertainty $\sigma_x$ to the positions it reports, and will correspondingly have the minimum possible uncertainty in
-momentum $\sigma_p$ allowed by the uncertainty relation between position and momentum, $\sigma_x\sigma_p = \frac{1}{2}$.
+uncertainty ${\sigma_x}$ to the positions it reports, and will correspondingly have the minimum possible uncertainty in
+momentum ${\sigma_p}$ allowed by the uncertainty relation between position and momentum, ${{\sigma_x\sigma_p} = {\frac{1}{2}}}$.
 
 Immediately after performing the simultaneous measurement, it's fairly reasonable to want the property that if we were
 to then perform an idealized exact measurement of position, it should statistically agree with the results of the
 previous simultaneous measurement (even though it may not match exactly).  And likewise for momentum, if we instead were
 to choose to immediately do an idealized momentum measurement.  To achieve this, we can make the measurement basis set
 consist entirely of minimum uncertainty Gaussian wavepackets that have standard deviations (of their positional PDFs)
-equal to $\sigma_x$.
+equal to ${\sigma_x}$.
 
 So our post-measurement state should be one of these Gaussian wavepackets, with central position and momentum sampled
 from the space of possible parameters (since picoputt is 2D, this space is 4D, as there are 2 degrees of freedom each
@@ -299,7 +299,7 @@ For a (somewhat) more rigorous approach to this description of simultaneous meas
 "meters" (one for position and one for momentum) which act like little quantum dials to show the results of the
 measurement.  The meter positions can later be measured (with ideal measurements) to get the values of the
 simultaneously measured position and momentum.  The post-measurement state of the measured system is a Gaussian
-wavepacket just as described previously.  Their "balance" $b=2\sigma_x^2$.
+wavepacket just as described previously.  Their "balance" ${{b} = {2\sigma_x^2}}$.
 
 With all that said, picoputt doesn't actually do any of this!  We're completely faking it!
 
@@ -341,13 +341,13 @@ a harmonic oscillator, for which the ground state is a Gaussian.  So our approxi
 just a Gaussian centered at the location of the hole.
 
 ### Putt wave
-When the player putts, we essentially want to apply some impulse $\Delta{}\vec{p}$ to the wavefunction.
+When the player putts, we essentially want to apply some impulse ${\Delta{}\vec{p}}$ to the wavefunction.
 The simplest and most "correct" way to do this would be to multiply the wavefunction with the plane wave
-$\exp\left({i\Delta{}\vec{p}\cdot\vec{x}}\right)$.
+${\exp\left({i\Delta{}\vec{p}\cdot\vec{x}}\right)}$.
 However, to give the player some more control,
-I wanted to constrain (most of) the effect of the putt to some circular region of radius $r$.
+I wanted to constrain (most of) the effect of the putt to some circular region of radius ${r}$.
 
-To accomplish this, I chose (for $\Delta{}\vec{p}$ along $\hat{x}$) the function:
+To accomplish this, I chose (for ${\Delta{}\vec{p}}$ along ${\hat{x}}$) the function:
 
 ```math
 \exp\left({i\Delta{}pr\arctan\left(\frac{x}{\sqrt{y^{2}+r^{2}}}\right)}\right)
