@@ -882,6 +882,16 @@ void showMeasurements() {
     }
 }
 
+SDL_FPoint randGaussian2D() {
+    // Box-Muller transform
+    double r = sqrt(-2. * log(((double)rand() + 1.) / ((double)RAND_MAX + 2.)));
+    double theta = 2. * M_PI * (double)rand() / ((double)RAND_MAX + 1.);
+    return (SDL_FPoint) {
+        .x=(float)(r*cos(theta)),
+        .y=(float)(r*sin(theta))
+    };
+}
+
 void doMeasurement(float sigma) {
     // This is meant to behave similarly to a partial measurement of
     // position.  The post measurement state is a gaussian wavepacket
@@ -911,8 +921,13 @@ void doMeasurement(float sigma) {
     float ry = quad[2*3 + 0];
     float iy = quad[2*3 + 1];
 
-    float px = atan2f(r0*ix - i0*rx, r0*rx + i0*ix)/dx;
-    float py = atan2f(r0*iy - i0*ry, r0*ry + i0*iy)/dx;
+    float sigma_x = sigma / M_SQRT2;
+    float sigma_p = 0.5f / sigma_x;
+    SDL_FPoint smear = randGaussian2D();
+    // smear = (SDL_FPoint){0.f, 0.f};
+    float px = atan2f(r0*ix - i0*rx, r0*rx + i0*ix)/dx + sigma_p * smear.x;
+    float py = atan2f(r0*iy - i0*ry, r0*ry + i0*iy)/dx + sigma_p * smear.y;
+    // SDL_Log("%f | %f, %f", hypotf(px, py), px, py);
 
     initPhysics(dx*(float)pos.x, dx*(float)pos.y, sigma);
     setPlaneWavePutt(px, py);
