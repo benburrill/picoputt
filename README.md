@@ -194,7 +194,7 @@ TODO: maybe talk about alternative dissipative effects?
 LIP integration is a seemingly novel numerical algorithm I designed for picoputt to approximate the drag potential.
 More generally it could be used to find a scalar potential for any vector field.
 As a non-iterative method, it is exact (up to numerical error) in the case of a conservative field,
-and non-conservative features (in particular, point vortices of the kind that occur in phase gradients)
+and non-conservative features (in particular, point vortices of the kind that occur in 2d phase gradients)
 have a reasonably small effect on the potential.
 
 The basic idea is pretty simple:
