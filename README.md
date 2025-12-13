@@ -191,10 +191,9 @@ TODO: discuss some interesting properties of phase drag
 TODO: maybe talk about alternative dissipative effects?
 
 ### LIP integration
-LIP integration is an unconventional (seemingly novel?)
-highly parallelizable non-iterative multi-scale method I designed for picoputt to determine the drag potential,
-but more generally it could be used to find a scalar potential for any vector field.
-It is exact (up to numerical error) in the case of a conservative field,
+LIP integration is a seemingly novel numerical algorithm I designed for picoputt to approximate the drag potential.
+More generally it could be used to find a scalar potential for any vector field.
+As a non-iterative method, it is exact (up to numerical error) in the case of a conservative field,
 and non-conservative features (in particular, point vortices of the kind that occur in phase gradients)
 have a reasonably small effect on the potential.
 
@@ -203,10 +202,15 @@ since the problem with non-conservative fields is essentially that
 different path integrals between 2 points can produce different results,
 we'll do some sort of weighted average of a whole bunch of path integrals to smooth over any inconsistencies.
 
-The algorithm constructs a multi-scale line integral pyramid (the eponymous LIP), recursively using locally-averaged line integrals
-from the previous layer to determine the line integrals between points twice as distant.
+The algorithm constructs a multi-scale line integral pyramid (the eponymous LIP).
+Each level of this pyramid consists of locally averaged line integrals to neighboring grid points at the given scale.
+The bottom layer is (essentially) the vectors of the field,
+and the layers above recursively use the (averaged) line integrals of the previous layer
+to determine line integrals between points twice as distant.
+For now, we need not specify the specific kernel used to do this local averaging,
+but it will be some weighted average of a small number of local paths between the 2 points, such that the weights add to 1.
 At the top layer of the pyramid, we have 4 line integrals, one for each edge of the rectangular grid,
-each one (in some way) incorporating every vector in the field.
+each one (in some way defined by the kernel) incorporating every vector in the field.
 
 From the top layer of the pyramid, we can determine values of the scalar potential for the 4 corners of the grid.
 From there we fill in the interior points in a "bilinear-ish" way, descending the pyramid to get the relevant line integrals.
@@ -222,20 +226,26 @@ To illustrate better, here's an example of the order in which points get filled 
 \end{matrix}
 ```
 
-From the skeleton of the algorithm I've laid out so far, for a grid with ${n}$ points, the sequential time complexity is ${O\left({n}\right)}$,
-and when parallelized, there are ${O\left({\log(n)}\right)}$ stages (same as parallel prefix sum).
-By comparison, in a more conventional "full-multigrid" iterative relaxation algorithm
-(see for example Pritt 1996[^pritt1996]),
-each FMG cycle also has ${O\left({n}\right)}$ sequential time complexity, but when parallelized they require ${O\left({\log(n)^2}\right)}$ stages.
-Many other alternatives (eg FFT-based approaches) also fall short in either sequential or parallel complexity.
+From the skeleton of the algorithm I've laid out so far, for a grid with ${n}$ points, the total work is ${O\left({n}\right)}$,
+and when parallelized, there are ${O\left({\log(n)}\right)}$ stages (the span).
+This is the same performance characteristics as a parallel prefix sum.
+You could naively use a parallel prefix sum for this task,
+integrating along some path that touches every grid point.
+However, no matter what path you choose, this would produce completely useless results with huge discontinuities.
+In a sense, LIP integration does some sort of average over exponentially many paths,
+for the same cost asymptotically as integrating over just a single path.
+
+A more conventional approach to this problem would be to perform a
+"full-multigrid" iterative relaxation algorithm (see for example Pritt 1996[^pritt1996]).
+By comparison, each FMG cycle also has ${O\left({n}\right)}$ work, but the parallel span is ${O\left({\log(n)^2}\right)}$.
+Many other alternatives (eg FFT-based approaches) also fall short in either work or span.
 
 So at least in theory, with sufficiently large grid sizes, on a GPU with sufficiently many cores,
 our algorithm should be faster (at the cost of potentially undesirable results for non-conservative fields).
-We just need to find a weighting scheme of nearby line integrals in the pyramid that minimizes the amount of jankiness
-to a level undetectable by the player.
+We just need to find a kernel that minimizes the amount of jankiness to a level undetectable by the player.
 
 The simplest case is the ${2^k + 1}$ grid sizes, as those can be perfectly subdivided.
-I found a good weighting scheme for these ${2^k + 1}$ grids quite quickly:  
+I stumbled on a good kernel for these ${2^k + 1}$ grids quite quickly:  
 ![Diagram showing weighting scheme which works well for 2^k + 1 grids](https://github.com/user-attachments/assets/9f800213-b7cd-4808-a1ec-b9d5096a81bf)
 
 As illustrated in the diagram above, the line-integrals of the next layer are a weighted average of up to 3 paths:
@@ -253,9 +263,11 @@ LIP-integration produces the following result (grid size is ${513\times{}513}$, 
 ![Plot comparing the phase of a central complex point vortex with the LIP-integration of its phase gradient](https://github.com/user-attachments/assets/21dd0237-d8b8-40db-bf2e-88765f7eb206)
 
 This is a fairly good result.
-This central vortex leaves behind only a small artifact on the reconstructed scalar potential,
-with extremes of ${{\pm{}(\arctan(1/2)-\arctan(1)/2)} \approx{} {\pm{}0.0709}}$, or about 2% of ${\pi{}}$.
+This central vortex leaves behind only a small residual artifact on the reconstructed scalar potential,
+with extremes of ${{\pm{}(\arctan(1/2)-\arctan(1)/2)} \approx{} {\pm{}0.0709}}$, or about 2% of ${\pm{}\pi{}}$.
 The effect is also spread out in a fairly even and rotationally symmetric way with no sharp discontinuities.
+
+I use this central-vortex residual as my primary quantitative metric for evaluating different kernels.
 
 Encouraged by this early success (and hypnotized by the pretty fractal patterns),
 I set out on a futile and somewhat pointless quest to "correctly" generalize the algorithm for other grid sizes.
