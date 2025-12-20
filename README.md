@@ -226,6 +226,13 @@ To illustrate better, here's an example of the order in which points get filled 
 \end{matrix}
 ```
 
+Alternating between the x and y axes, we use previously determined values of ${V_A}$ and ${V_C}$ to fill in the value of ${V_B}$ between them,
+using the line integrals ${\Delta{}V_{AB}}$ and ${\Delta{}V_{BC}}$ from the pyramid:
+
+```math
+V_B = \frac{1}{2} \left(V_A + \Delta{}V_{AB}\right) + \frac{1}{2} \left(V_C - \Delta{}V_{BC}\right)
+```
+
 From the skeleton of the algorithm I've laid out so far, for a grid with ${n}$ points, the total work is ${O\left({n}\right)}$,
 and when parallelized, there are ${O\left({\log(n)}\right)}$ stages (the span).
 This is the same performance characteristics as a parallel prefix sum.
