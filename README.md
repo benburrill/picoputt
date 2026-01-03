@@ -274,8 +274,6 @@ This central vortex leaves behind only a small residual artifact on the reconstr
 with extremes of ${{\pm{}(\arctan(1/2)-\arctan(1)/2)} \approx{} {\pm{}0.0709}}$, or about 2% of ${\pm{}\pi{}}$.
 The effect is also spread out in a fairly even and rotationally symmetric way with no sharp discontinuities.
 
-I use this central-vortex residual as my primary quantitative metric for evaluating different kernels.
-
 Encouraged by this early success (and hypnotized by the pretty fractal patterns),
 I set out on a futile and somewhat pointless quest to "correctly" generalize the algorithm for other grid sizes.
 
