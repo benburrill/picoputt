@@ -212,7 +212,8 @@ but it will be some weighted average of a small number of local paths between th
 At the top layer of the pyramid, we have 4 line integrals, one for each edge of the rectangular grid,
 each one (in some way defined by the kernel) incorporating every vector in the field.
 
-From the top layer of the pyramid, we can determine values of the scalar potential for the 4 corners of the grid.
+From the top layer of the pyramid, we can determine values of the scalar potential for the 4 corners of the grid, as the
+least-squares solution from our 4 line integrals.
 From there we fill in the interior points in a "bilinear-ish" way, descending the pyramid to get the relevant line integrals.
 To illustrate better, here's an example of the order in which points get filled in for a small grid:
 
@@ -285,6 +286,12 @@ I finally gave up as I was getting nowhere.  All my attempts have some undesirab
 The generalization picoputt uses I picked because it's relatively easy to implement and seems to give decent results for many grid sizes,
 despite making basically no sense whatsoever.  It does not merit more explanation here,
 but if you want to know how the sausage is made, see [the code](shaders/drag).
+
+Since working on the implementation for picoputt, I've made a little bit more progress.
+Probably the most obvious way to deal with different size grids is to simply fill to the next largest ${2^k+1}$ with a conservative field.
+When I tried this initially (trying to "simulate" the fill at the level of the kernel) I made a mistake, but if you do it correctly
+it's not so bad, probably slightly better than what picoputt uses.
+Still, there is a lot I don't understand about LIP integration, and more work to be done.
 
 ### Measurement
 TODO: briefly introduce the concept of a quantum measurement?
